@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Data.SQLite" Version="1.0.119" />
+    <PackageReference Include="Twilio" Version="7.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="log4net">
+      <HintPath>..\..\..\..\Downloads\NO.4 SDK for Fingerprint Models(2960) - BS Structure - Cloud-Based\SDK-BS-Cloud-Based-WebSocket(2960)\2.demo-C#-SourceCode\bin\20181116\log4net.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\..\..\..\Downloads\NO.4 SDK for Fingerprint Models(2960) - BS Structure - Cloud-Based\SDK-BS-Cloud-Based-WebSocket(2960)\2.demo-C#-SourceCode\bin\20181116\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSocket.Common">
+      <HintPath>..\..\..\..\Downloads\NO.4 SDK for Fingerprint Models(2960) - BS Structure - Cloud-Based\SDK-BS-Cloud-Based-WebSocket(2960)\2.demo-C#-SourceCode\bin\20181116\SuperSocket.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSocket.SocketBase">
+      <HintPath>..\..\..\..\Downloads\NO.4 SDK for Fingerprint Models(2960) - BS Structure - Cloud-Based\SDK-BS-Cloud-Based-WebSocket(2960)\2.demo-C#-SourceCode\bin\20181116\SuperSocket.SocketBase.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSocket.SocketEngine">
+      <HintPath>..\..\..\..\Downloads\NO.4 SDK for Fingerprint Models(2960) - BS Structure - Cloud-Based\SDK-BS-Cloud-Based-WebSocket(2960)\2.demo-C#-SourceCode\bin\20181116\SuperSocket.SocketEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSocket.WebSocket">
+      <HintPath>..\..\..\..\Downloads\NO.4 SDK for Fingerprint Models(2960) - BS Structure - Cloud-Based\SDK-BS-Cloud-Based-WebSocket(2960)\2.demo-C#-SourceCode\bin\20181116\SuperSocket.WebSocket.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
