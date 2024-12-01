@@ -1,4 +1,5 @@
-﻿using System;
+﻿using AttendanceSystem.Services;
+using System;
 
 namespace AttendanceSystem
 {
@@ -12,7 +13,7 @@ namespace AttendanceSystem
             realandSdk.InitializeWebSocketServer("2012"); // Example port
 
             var notificationService = new NotificationService();
-            notificationService.SendLateNotification("Meir Ben Zion Dvir", "12345678", "+972535321275", "12/01/2024");
+            notificationService.SendLateNotification("Meir Ben Zion Dvir", "12345678", "+972535321275", "12/12/2024");
 
             Console.WriteLine("Press any key to exit...");
             Console.ReadKey();
