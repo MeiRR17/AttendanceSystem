@@ -53,3 +53,5 @@ C:\Users\mbzdv\source\repos\AttendanceSystem\AttendanceSystem\bin\Debug\net8.0\M
 C:\Users\mbzdv\source\repos\AttendanceSystem\AttendanceSystem\bin\Debug\net8.0\System.IdentityModel.Tokens.Jwt.dll
 C:\Users\mbzdv\source\repos\AttendanceSystem\AttendanceSystem\bin\Debug\net8.0\Twilio.dll
 C:\Users\mbzdv\source\repos\AttendanceSystem\AttendanceSystem\obj\Debug\net8.0\AttendanceSystem.sourcelink.json
+C:\Users\mbzdv\source\repos\AttendanceSystem\AttendanceSystem\bin\Debug\net8.0\NodaTime.dll
+C:\Users\mbzdv\source\repos\AttendanceSystem\AttendanceSystem\bin\Debug\net8.0\Zmanim.dll

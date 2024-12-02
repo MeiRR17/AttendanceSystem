@@ -7,13 +7,13 @@ namespace AttendanceSystem
     {
         static void Main(string[] args)
         {
-            DatabaseSetup.CreateDatabase();
+            DatabaseSetup.InitializeDatabase();
 
             var realandSdk = new RealandSDK();
-            realandSdk.InitializeWebSocketServer("2012"); // Example port
+            realandSdk.InitializeWebSocketServer("2012");
 
             var notificationService = new NotificationService();
-            notificationService.SendLateNotification("Meir Ben Zion Dvir", "12345678", "+972535321275", "12/12/2024");
+            notificationService.SendLateNotification("מאיר בן ציון דביר", "12345678", "+972535321275", DateTime.Now);
 
             Console.WriteLine("Press any key to exit...");
             Console.ReadKey();

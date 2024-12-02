@@ -5,6 +5,7 @@ using SuperSocket.SocketBase;
 using System.Collections.Generic;
 using SuperSocket.SocketBase.Config;
 using System.Data.SQLite;
+using AttendanceSystem.Services; // Ensure this line is included
 
 public class RealandSDK
 {
@@ -71,9 +72,9 @@ public class RealandSDK
 
     private async void StoreAttendanceData(string studentID, string name, string phoneNumber, DateTime timestamp)
     {
-        await HolidayChecker.InitializeHolidays();
+        await HolidayChecker.InitializeHolidays(); // Correct namespace reference
 
-        if (HolidayChecker.IsWeekendOrHoliday(timestamp))
+        if (HolidayChecker.IsWeekendOrHoliday(timestamp)) // Correct namespace reference
         {
             Console.WriteLine("Today is a weekend or holiday. No attendance recorded.");
             return;

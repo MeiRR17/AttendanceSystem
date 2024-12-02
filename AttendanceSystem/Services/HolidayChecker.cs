@@ -1,29 +1,26 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using AttendanceSystem.Services;
-
-
-public static class HolidayChecker
+﻿namespace AttendanceSystem.Services
 {
-    private static List<DateTime> holidays = new List<DateTime>();
-
-    public static async Task InitializeHolidays()
+    public static class HolidayChecker
     {
-        int currentYear = DateTime.Now.Year;
-        holidays = await HolidayFetcher.GetHebrewHolidays(currentYear);
-    }
+        private static List<DateTime> holidays = new List<DateTime>();
 
-    public static bool IsWeekendOrHoliday(DateTime date)
-    {
-        if (date.DayOfWeek == DayOfWeek.Friday || date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday)
+        public static async Task InitializeHolidays()
         {
-            return true;
+            int currentYear = DateTime.Now.Year;
+            holidays = await HolidayFetcher.GetHebrewHolidays(currentYear);
         }
-        if (holidays.Contains(date.Date))
+
+        public static bool IsWeekendOrHoliday(DateTime date)
         {
-            return true;
+            if (date.DayOfWeek == DayOfWeek.Friday || date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday)
+            {
+                return true;
+            }
+            if (holidays.Contains(date.Date))
+            {
+                return true;
+            }
+            return false;
         }
-        return false;
     }
 }

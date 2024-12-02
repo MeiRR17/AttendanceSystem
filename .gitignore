@@ -1,0 +1,21 @@
+# Exclude the .vs directory
+.vs/
+
+# Exclude build outputs
+bin/
+obj/
+
+# Exclude other temporary files
+*.user
+*.log
+*.tlog
+*.pdb
+*.cache
+*.ilk
+*.ipch
+*.aps
+*.ncb
+*.suo
+*.sdf
+*.opensdf
+*.tlog

@@ -46,6 +46,10 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "NodaTime": {
+              "target": "Package",
+              "version": "[3.2.0, )"
+            },
             "System.Data.SQLite": {
               "target": "Package",
               "version": "[1.0.119, )"
@@ -53,6 +57,10 @@
             "Twilio": {
               "target": "Package",
               "version": "[7.7.0, )"
+            },
+            "Zmanim": {
+              "target": "Package",
+              "version": "[1.5.0, )"
             }
           },
           "imports": [

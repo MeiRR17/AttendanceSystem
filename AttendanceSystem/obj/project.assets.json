@@ -187,6 +187,19 @@
           }
         }
       },
+      "NodaTime/3.2.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/NodaTime.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/NodaTime.dll": {
+            "related": ".pdb;.xml"
+          }
+        }
+      },
       "runtime.native.System.Data.SqlClient.sni/4.7.0": {
         "type": "package",
         "dependencies": {
@@ -798,6 +811,19 @@
             "related": ".xml"
           }
         }
+      },
+      "Zmanim/1.5.0": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.0/Zmanim.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/Zmanim.dll": {
+            "related": ".pdb;.xml"
+          }
+        }
       }
     }
   },
@@ -1153,6 +1179,27 @@
         "newtonsoft.json.13.0.1.nupkg.sha512",
         "newtonsoft.json.nuspec",
         "packageIcon.png"
+      ]
+    },
+    "NodaTime/3.2.0": {
+      "sha512": "yoRA3jEJn8NM0/rQm78zuDNPA3DonNSZdsorMUj+dltc1D+/Lc5h9YXGqbEEZozMGr37lAoYkcSM/KjTVqD0ow==",
+      "type": "package",
+      "path": "nodatime/3.2.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net6.0/NodaTime.dll",
+        "lib/net6.0/NodaTime.pdb",
+        "lib/net6.0/NodaTime.xml",
+        "lib/net8.0/NodaTime.dll",
+        "lib/net8.0/NodaTime.pdb",
+        "lib/net8.0/NodaTime.xml",
+        "lib/netstandard2.0/NodaTime.dll",
+        "lib/netstandard2.0/NodaTime.pdb",
+        "lib/netstandard2.0/NodaTime.xml",
+        "nodatime.3.2.0.nupkg.sha512",
+        "nodatime.nuspec"
       ]
     },
     "runtime.native.System.Data.SqlClient.sni/4.7.0": {
@@ -2944,12 +2991,34 @@
         "twilio.7.7.0.nupkg.sha512",
         "twilio.nuspec"
       ]
+    },
+    "Zmanim/1.5.0": {
+      "sha512": "dFBZ2bPx9IXvBGsXTEtHeSXYVJT5hDXSc3y6vWFi66Fa3GnGdOa8JN1OtdDcbNMENkoTWi+mRywEUuHi7NQO/A==",
+      "type": "package",
+      "path": "zmanim/1.5.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "lib/netstandard1.0/Zmanim.dll",
+        "lib/netstandard1.0/Zmanim.pdb",
+        "lib/netstandard1.0/Zmanim.xml",
+        "lib/netstandard1.3/Zmanim.dll",
+        "lib/netstandard1.3/Zmanim.pdb",
+        "lib/netstandard1.3/Zmanim.xml",
+        "lib/netstandard2.0/Zmanim.dll",
+        "lib/netstandard2.0/Zmanim.pdb",
+        "lib/netstandard2.0/Zmanim.xml",
+        "zmanim.1.5.0.nupkg.sha512",
+        "zmanim.nuspec"
+      ]
     }
   },
   "projectFileDependencyGroups": {
     "net8.0": [
+      "NodaTime >= 3.2.0",
       "System.Data.SQLite >= 1.0.119",
-      "Twilio >= 7.7.0"
+      "Twilio >= 7.7.0",
+      "Zmanim >= 1.5.0"
     ]
   },
   "packageFolders": {
@@ -2997,6 +3066,10 @@
       "net8.0": {
         "targetAlias": "net8.0",
         "dependencies": {
+          "NodaTime": {
+            "target": "Package",
+            "version": "[3.2.0, )"
+          },
           "System.Data.SQLite": {
             "target": "Package",
             "version": "[1.0.119, )"
@@ -3004,6 +3077,10 @@
           "Twilio": {
             "target": "Package",
             "version": "[7.7.0, )"
+          },
+          "Zmanim": {
+            "target": "Package",
+            "version": "[1.5.0, )"
           }
         },
         "imports": [

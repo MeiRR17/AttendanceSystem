@@ -3,26 +3,28 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
-using AttendanceSystem.Services;
 
-public static class HolidayFetcher
+namespace AttendanceSystem.Services
 {
-    public static async Task<List<DateTime>> GetHebrewHolidays(int year)
+    public static class HolidayFetcher
     {
-        var holidays = new List<DateTime>();
-
-        using (var client = new HttpClient())
+        public static async Task<List<DateTime>> GetHebrewHolidays(int year)
         {
-            var response = await client.GetStringAsync($"https://www.hebcal.com/hebcal?v=1&cfg=json&year={year}&maj=on&mod=on&minor=on");
-            var json = JObject.Parse(response);
+            var holidays = new List<DateTime>();
 
-            foreach (var item in json["items"])
+            using (var client = new HttpClient())
             {
-                var date = DateTime.Parse(item["date"].ToString());
-                holidays.Add(date);
-            }
-        }
+                var response = await client.GetStringAsync($"https://www.hebcal.com/hebcal?v=1&cfg=json&year={year}&maj=on&mod=on&minor=on");
+                var json = JObject.Parse(response);
 
-        return holidays;
+                foreach (var item in json["items"])
+                {
+                    var date = DateTime.Parse(item["date"].ToString());
+                    holidays.Add(date);
+                }
+            }
+
+            return holidays;
+        }
     }
 }
