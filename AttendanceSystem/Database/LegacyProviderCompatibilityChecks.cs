@@ -68,6 +68,12 @@ internal static class LegacyProviderCompatibilityChecks
             // modify the original 1.x fixture or authorize an actual upgrade.
             using var testReviewers = new SyntheticMigrationApprovalTestSigners();
             SyntheticMigrationApprovalSmokeChecks.Run(sha, schema, testReviewers, path);
+            using var rootSigner = new SyntheticOfflineRootTestSigner();
+            SyntheticOfflineRootTrustSmokeChecks.Run(path, testReviewers, rootSigner);
+            var rootPolicy = rootSigner.Sign(
+                testReviewers.TrustPolicy.Snapshot(), 1, DateTimeOffset.UtcNow);
+            var rootPin = rootSigner.PinnedRootPublicKey;
+            var epochLedger = new SyntheticTrustEpochLedger(path);
             var review = testReviewers.Sign(
                 testReviewers.NewRequest(sha, schema, DateTimeOffset.UtcNow));
             var oneTimeRehearsalLedger =
@@ -78,7 +84,7 @@ internal static class LegacyProviderCompatibilityChecks
             {
                 SyntheticMigrationRehearsal.Run(
                     path, new string('0', 64), review,
-                    testReviewers.TrustPolicy, oneTimeRehearsalLedger);
+                    rootPolicy, rootPin, epochLedger, oneTimeRehearsalLedger);
             }
             catch (InvalidOperationException) { rejectedReceipt = true; }
             Check(rejectedReceipt, "wrong fixture digest rejects before any clone");
@@ -86,7 +92,7 @@ internal static class LegacyProviderCompatibilityChecks
                   "invalid fixture receipt created no clone");
 
             var recovery = SyntheticMigrationRehearsal.Run(
-                path, sha, review, testReviewers.TrustPolicy,
+                path, sha, review, rootPolicy, rootPin, epochLedger,
                 oneTimeRehearsalLedger);
             receipts.Add(recovery);
 
@@ -94,7 +100,8 @@ internal static class LegacyProviderCompatibilityChecks
             try
             {
                 SyntheticMigrationRehearsal.Run(
-                    path, sha, review, testReviewers.TrustPolicy,
+                    path, sha, review, rootPolicy, rootPin,
+                    new SyntheticTrustEpochLedger(path),
                     new SyntheticDurableReviewNonceLedger(path));
             }
             catch (InvalidOperationException) { replayDenied = true; }
@@ -112,6 +119,7 @@ internal static class LegacyProviderCompatibilityChecks
                   recovery.RollbackToOriginalSchemaVerified &&
                   recovery.SyntheticDualReviewVerified &&
                   recovery.DurableReviewLedgerUsed &&
+                  recovery.OfflineRootTrustVerified &&
                   !recovery.RealDataUsed &&
                   !recovery.ProductionMigrationAuthorized &&
                   recovery.Decision == "NO-GO",
