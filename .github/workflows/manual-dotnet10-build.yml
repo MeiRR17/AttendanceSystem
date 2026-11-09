@@ -18,6 +18,7 @@ on:
       - 'codex/v1.0.0-rc2-sqlite-2.0.4-migration-20261109'
       - 'codex/v1.0.0-rc3-legacy-sqlite-compat-20261109'
       - 'codex/v1.0.0-rc4-legacy-schema-preflight-20261109'
+      - 'codex/v1.0.0-rc5-explicit-synthetic-migration-gate-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
@@ -25,6 +26,7 @@ on:
       - 'docs/SQLITE_V1_COMPATIBILITY.md'
       - 'docs/SQLITE_MIGRATION_PREFLIGHT.md'
       - 'docs/SQLITE_PUBLIC_UPGRADE_GATE.md'
+      - 'docs/SQLITE_MIGRATION_REHEARSAL.md'
       - 'global.json'
       - '.github/workflows/manual-dotnet10-build.yml'
       - 'deploy/staging/**'
@@ -69,25 +71,63 @@ jobs:
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test
       - name: SQLite migration, public bypass denial, test fixture path and dedup checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-db
-      - name: Legacy SQLite 1.x -> v2 compatibility, schema preflight, negative-control and non-loss
+      - name: Legacy SQLite 1.x -> v2 clone-only migration, backup, rollback and non-loss
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $dir = Join-Path ([IO.Path]::GetTempPath()) ("attendance-legacy-fixture-" + [guid]::NewGuid().ToString("N"))
           New-Item -ItemType Directory -Path $dir | Out-Null
+          $evidence = Join-Path ([IO.Path]::GetTempPath()) "attendance-rc6-migration-evidence"
+          if (Test-Path -LiteralPath $evidence) {
+            throw 'Migration evidence directory must start absent.'
+          }
+          New-Item -ItemType Directory -Path $evidence | Out-Null
           try {
             $env:ATTENDANCE_SYNTHETIC_FIXTURES = "true"
+            $env:ATTENDANCE_MIGRATION_EVIDENCE_DIR = $evidence
             $env:ATTENDANCE_LEGACY_FIXTURE_DIR = $dir
             dotnet run --project tests/LegacyProviderFixture/LegacyProviderFixture.csproj --configuration Release -- "$dir"
             if ($LASTEXITCODE -ne 0) { throw 'Legacy provider 1.x fixture creation failed.' }
             dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-legacy-compat
             if ($LASTEXITCODE -ne 0) { throw 'SQLite v2 legacy compatibility check failed.' }
+            $manifest = Join-Path $evidence "migration-rehearsal.json"
+            $checksums = Join-Path $evidence "SHA256SUMS.txt"
+            if (-not (Test-Path $manifest) -or -not (Test-Path $checksums)) {
+              throw 'Synthetic-only recovery evidence was not produced.'
+            }
+            $report = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+            if ($report.decision -ne "NO-GO" -or
+                $report.productionMigrationAuthorized -ne $false -or
+                $report.generatedDataOnly -ne $true -or
+                @($report.result).Count -ne 2) {
+              throw 'Migration evidence does not have a safe NO-GO contract.'
+            }
+            $actual = (Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash.ToLowerInvariant()
+            $expected = (Get-Content -LiteralPath $checksums -Raw).Trim().Split(' ')[0]
+            if ($actual -ne $expected) {
+              throw 'Migration evidence integrity digest mismatch.'
+            }
+            $artifactOutput = Join-Path $env:RUNNER_TEMP "attendance-rc6-migration-evidence"
+            New-Item -ItemType Directory -Path $artifactOutput -ErrorAction Stop | Out-Null
+            Copy-Item -LiteralPath $manifest -Destination $artifactOutput
+            Copy-Item -LiteralPath $checksums -Destination $artifactOutput
           }
           finally {
+            Remove-Item Env:ATTENDANCE_MIGRATION_EVIDENCE_DIR -ErrorAction SilentlyContinue
             Remove-Item Env:ATTENDANCE_SYNTHETIC_FIXTURES -ErrorAction SilentlyContinue
             Remove-Item Env:ATTENDANCE_LEGACY_FIXTURE_DIR -ErrorAction SilentlyContinue
             if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
+            if (Test-Path -LiteralPath $evidence) {
+              Remove-Item -LiteralPath $evidence -Recurse -Force
+            }
           }
+      - name: Upload synthetic-only SQLite recovery evidence (NOT production approval)
+        uses: actions/upload-artifact@v4
+        with:
+          name: attendance-rc6-rehearsal-no-go-${{ github.run_id }}
+          path: ${{ runner.temp }}/attendance-rc6-migration-evidence/
+          if-no-files-found: error
+          retention-days: 7
       - name: Authenticated bridge synthetic 1000-event and negative checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-bridge
       - name: Attendance policy, Israel DST, audit and offline Hebcal fixture checks
