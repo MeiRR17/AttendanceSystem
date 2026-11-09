@@ -20,7 +20,7 @@ internal sealed record SyntheticMigrationReviewRequest(
     long ExpiresAtUnixSeconds);
 
 internal sealed record SyntheticMigrationEndorsement(
-    string Role, byte[] Signature);
+    string Role, string KeyId, byte[] Signature);
 
 internal sealed record SyntheticMigrationReviewEnvelope(
     SyntheticMigrationReviewRequest Request,
@@ -30,11 +30,16 @@ internal sealed record SyntheticMigrationReviewEnvelope(
 /// In-memory nonce tracking is intentionally ephemeral: an offline CI smoke
 /// control against accidental replay, NOT a production replay ledger.
 /// </summary>
-internal sealed class SyntheticReviewNonceLedger
+internal interface ISyntheticReviewNonceLedger
+{
+    bool TryConsume(string key);
+}
+
+internal sealed class SyntheticReviewNonceLedger : ISyntheticReviewNonceLedger
 {
     private readonly HashSet<string> consumed = new(StringComparer.Ordinal);
 
-    internal bool TryConsume(string key)
+    public bool TryConsume(string key)
     {
         lock (consumed)
             return consumed.Add(key);
@@ -54,11 +59,11 @@ internal static class SyntheticMigrationApprovalGate
         SyntheticMigrationReviewEnvelope? envelope,
         string actualFixtureSha256,
         int actualSchemaVersion,
-        IReadOnlyDictionary<string, byte[]>? pinnedTestPublicKeys,
-        SyntheticReviewNonceLedger? replayLedger,
+        SyntheticReviewerTrustPolicy? trustedReviewerRegistry,
+        ISyntheticReviewNonceLedger? replayLedger,
         DateTimeOffset nowUtc)
     {
-        if (envelope is null || pinnedTestPublicKeys is null ||
+        if (envelope is null || trustedReviewerRegistry is null ||
             replayLedger is null || envelope.Request is null)
             Deny();
 
@@ -83,10 +88,7 @@ internal static class SyntheticMigrationApprovalGate
             request.ExpiresAtUnixSeconds <= request.IssuedAtUnixSeconds)
             Deny();
 
-        if (pinnedTestPublicKeys!.Count != 2 ||
-            !pinnedTestPublicKeys.ContainsKey(PrivacyRole) ||
-            !pinnedTestPublicKeys.ContainsKey(OperationsRole) ||
-            envelope.Endorsements is null ||
+        if (envelope.Endorsements is null ||
             envelope.Endorsements.Count != 2)
             Deny();
 
@@ -96,21 +98,21 @@ internal static class SyntheticMigrationApprovalGate
             if (endorsement is null ||
                 !seenRoles.Add(endorsement.Role) ||
                 endorsement.Role is not (PrivacyRole or OperationsRole) ||
+                !IsHex(endorsement.KeyId, 64) ||
                 endorsement.Signature is null ||
                 endorsement.Signature.Length != 64)
                 Deny();
 
             try
             {
-                var trustedPublicKey = pinnedTestPublicKeys[endorsement.Role];
-                if (trustedPublicKey is null || trustedPublicKey.Length is < 64 or > 200)
-                    Deny();
+                var trustedPublicKey = trustedReviewerRegistry!.Resolve(
+                    endorsement.Role, endorsement.KeyId, nowUtc);
 
                 using var verifier = ECDsa.Create();
                 verifier.ImportSubjectPublicKeyInfo(trustedPublicKey, out int read);
                 if (read != trustedPublicKey.Length || verifier.KeySize != 256 ||
                     !verifier.VerifyData(
-                        CanonicalMessage(request, endorsement.Role),
+                        CanonicalMessage(request, endorsement.Role, endorsement.KeyId),
                         endorsement.Signature,
                         HashAlgorithmName.SHA256,
                         DSASignatureFormat.IeeeP1363FixedFieldConcatenation))
@@ -133,7 +135,7 @@ internal static class SyntheticMigrationApprovalGate
     }
 
     internal static byte[] CanonicalMessage(
-        SyntheticMigrationReviewRequest request, string role)
+        SyntheticMigrationReviewRequest request, string role, string keyId)
     {
         // Exact, domain-separated, culture-independent ASCII fields.
         // Each field is constrained above before verification; signers in CI
@@ -149,7 +151,8 @@ internal static class SyntheticMigrationApprovalGate
             request.Nonce.ToUpperInvariant(),
             request.IssuedAtUnixSeconds.ToString(CultureInfo.InvariantCulture),
             request.ExpiresAtUnixSeconds.ToString(CultureInfo.InvariantCulture),
-            role
+            role,
+            keyId.ToUpperInvariant()
         });
         return Encoding.ASCII.GetBytes(value);
     }

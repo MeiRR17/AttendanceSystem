@@ -25,6 +25,7 @@ internal static class SyntheticMigrationEvidence
                 !r.PreMigrationBackupVerified ||
                 !r.RollbackToOriginalSchemaVerified ||
                 !r.SyntheticDualReviewVerified ||
+                !r.DurableReviewLedgerUsed ||
                 r.RealDataUsed || r.ProductionMigrationAuthorized ||
                 r.Decision != "NO-GO"))
             throw new InvalidOperationException(

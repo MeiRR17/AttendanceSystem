@@ -53,6 +53,7 @@ A scoped GitHub Actions pull-request workflow provides a clean Windows .NET 10 b
 - [v1.0.0-rc.5 public upgrade blocked, synthetic-only isolated migration](docs/SQLITE_PUBLIC_UPGRADE_GATE.md)
 - [v1.0.0-rc.6 clone-only legacy migration recovery rehearsal and NO-GO evidence](docs/SQLITE_MIGRATION_REHEARSAL.md)
 - [v1.0.0-rc.7 dual-signed synthetic migration reviews (still NO-GO)](docs/SQLITE_SYNTHETIC_SIGNED_REVIEWS.md)
+- [v1.0.0-rc.8 synthetic reviewer key revocation and persistent replay tests](docs/SQLITE_REVIEWER_TRUST_AND_REPLAY.md)
 - [NO-GO change-control and support handoff template](docs/RELEASE_CHANGE_TEMPLATE.md)
 - [Production Go/No-Go checklist](docs/PRODUCTION_CHECKLIST.md)
 - [Version and issue tracker](https://github.com/MeiRR17/AttendanceSystem/issues/3)
