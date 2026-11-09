@@ -140,10 +140,39 @@ public static class AdminApiSmokeChecks
                           !body.Contains("private-test-student",StringComparison.Ordinal),
                           "public shell serves only static UI");
                 }
+                using (var res=await SendAsync(HttpMethod.Get,"/api/v1/health/ready"))
+                {
+                    Check(res.StatusCode==HttpStatusCode.OK,
+                          "coarse readiness succeeds for healthy synthetic DB");
+                    var body = await res.Content.ReadAsStringAsync();
+                    Check(body.Contains("\"ready\":true",StringComparison.Ordinal) &&
+                          !body.Contains("synthetic-device",StringComparison.Ordinal) &&
+                          !body.Contains("private-test-student",StringComparison.Ordinal),
+                          "anonymous readiness reveals only boolean");
+                }
+                using (var res=await SendAsync(HttpMethod.Get,"/api/v1/ops/status"))
+                    Check(res.StatusCode==HttpStatusCode.Unauthorized,
+                          "anonymous operational metrics denied");
                 using (var res=await SendAsync(HttpMethod.Get,"/api/v1/overview"))
                     Check(res.StatusCode==HttpStatusCode.Unauthorized,"anonymous denied counts");
                 using (var res=await SendAsync(HttpMethod.Get,"/api/v1/overview",viewer))
                     Check(res.StatusCode==HttpStatusCode.OK,"viewer aggregate allowed");
+                using (var res=await SendAsync(HttpMethod.Get,"/api/v1/ops/status",viewer))
+                    Check(res.StatusCode==HttpStatusCode.Forbidden,
+                          "Viewer role denied operational details");
+                using (var res=await SendAsync(HttpMethod.Get,"/api/v1/ops/status",staff))
+                    Check(res.StatusCode==HttpStatusCode.Forbidden,
+                          "Staff role denied operational details");
+                using (var res=await SendAsync(HttpMethod.Get,"/api/v1/ops/status",admin))
+                {
+                    Check(res.StatusCode==HttpStatusCode.OK,
+                          "Administrator sees operational aggregates");
+                    var body=await res.Content.ReadAsStringAsync();
+                    Check(body.Contains("not_verified",StringComparison.Ordinal) &&
+                          !body.Contains("private-test-student",StringComparison.Ordinal) &&
+                          !body.Contains("synthetic-device",StringComparison.Ordinal),
+                          "operational metrics do not expose device or student IDs");
+                }
                 using (var res=await SendAsync(HttpMethod.Get,"/api/v1/events",viewer))
                     Check(res.StatusCode==HttpStatusCode.Forbidden,"viewer cannot read event list");
                 using (var res=await SendAsync(HttpMethod.Get,"/api/v1/exports",viewer))

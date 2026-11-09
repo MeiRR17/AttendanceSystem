@@ -79,6 +79,7 @@
     byId("page-subtitle").textContent = viewTitles[key][1];
     if (key === "audit") renderAudit();
     if (key === "events") renderEvents();
+    if (key === "system") void renderSystem();
   };
   const countMap = events => {
     const counts = {};
@@ -257,6 +258,65 @@
       byId("refresh-button").disabled = false;
     }
   };
+  const renderSystem = async () => {
+    const panel = byId("operations-panel");
+    panel.replaceChildren();
+    if (isDemo()) {
+      panel.append(node("p","muted",
+        "הדגמה סינתטית בלבד: אין מדדי קליטה חיים, מכשירים או התראות אמיתיות."));
+      const rows = node("dl","ops-list");
+      for (const [name,value] of [
+        ["בדיקות מוכנות","לא בוצעו בדיקות חיות במצב הדגמה"],
+        ["קליטת מכשירים","לא מחובר"],
+        ["תור התראות","הדמיה בלבד"],
+        ["שגיאות מסד נתונים","לא ידוע במצב הדגמה"]
+      ]) {
+        const row = node("div");
+        row.append(node("dt","",name),node("dd","",value));
+        rows.append(row);
+      }
+      panel.append(rows);
+      return;
+    }
+    if (!hasAdmin()) {
+      panel.append(node("p","muted",
+        "נתוני ניטור מפורטים זמינים רק למנהל מערכת מורשה."));
+      return;
+    }
+    if (!state.token) {
+      panel.append(node("p","muted","נדרש JWT מאומת כדי לקרוא מדדים."));
+      return;
+    }
+    panel.append(node("p","muted","טוען מדדי מוכנות..."));
+    try {
+      const report = await apiGet("/api/v1/ops/status");
+      const ops = node("dl","ops-list");
+      const values = [
+        ["מוכנות SQLite",report.ready ? "תקין" : "לא מוכן"],
+        ["קוד מצב",report.code || "לא זמין"],
+        ["קליטת מכשירים", "לא אומת"],
+        ["אירועים שנקלטו (מאז אתחול)",report.metrics?.insertedEvents ?? "—"],
+        ["חבילות כפולות",report.metrics?.duplicateReplays ?? "—"],
+        ["שגיאות כתיבה",report.metrics?.databaseWriteErrors ?? "—"],
+        ["p95 זמן שמירה (ms)",report.metrics?.persistP95Milliseconds ?? "אין מדגם"],
+        ["התראות ממתינות (הדמיה)",report.pendingDryRunNotifications ?? 0],
+        ["תוצאות לא ודאיות",report.uncertainDryRunNotifications ?? 0],
+        ["כשל סופי",report.deadLetterDryRunNotifications ?? 0],
+        ["אזהרות",Array.isArray(report.alerts) ?
+          report.alerts.join(", ") || "אין אזהרות" : "לא ידוע"]
+      ];
+      for (const [name,value] of values) {
+        const row = node("div");
+        row.append(node("dt","",name),node("dd","",String(value)));
+        ops.append(row);
+      }
+      panel.replaceChildren(ops);
+    } catch (error) {
+      panel.replaceChildren(node("p","muted",
+        error.message || "לא ניתן לטעון את מדדי התפעול."));
+    }
+  };
+
   const openCorrection = item => {
     if (!hasStaff()) return;
     byId("correction-event-id").value = String(item.eventId);

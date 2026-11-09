@@ -2,6 +2,7 @@ using System.Data.SQLite;
 using System.Globalization;
 using System.Text;
 using AttendanceSystem.Database;
+using AttendanceSystem.Operations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -145,11 +146,14 @@ public static class BridgeServer
             }
             catch (GatewayRejection error)
             {
+                OperationalMetrics.RecordRejected(error.StatusCode);
                 return Results.StatusCode(error.StatusCode);
             }
             catch (SQLiteException)
             {
-                // Do not ACK unsaved data or leak internal database details.
+                // SQLite errors cannot yield successful ACKs. No private SQL
+                // details are returned in the response or metric labels.
+                OperationalMetrics.RecordDatabaseError();
                 return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
         });

@@ -4,6 +4,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Xml;
 using AttendanceSystem.Database;
+using AttendanceSystem.Operations;
+using System.Diagnostics;
 
 namespace AttendanceSystem.Gateway;
 
@@ -90,12 +92,19 @@ public sealed class AuthenticatedEventGateway
         var eventData = ParseAndValidate(xml, now);
         try
         {
+            var start = Stopwatch.GetTimestamp();
             var result = _store.Save(new AttendanceEventInput(
                 _boundDeviceId, eventData.EventKey, eventData.StudentId, eventData.OccurredAtUtc));
-            // Only acknowledge after the SQLite transaction has been committed.
-            return result == AttendanceWriteResult.Inserted
-                ? GatewayOutcome.Inserted
-                : GatewayOutcome.Duplicate;
+            var elapsed = Stopwatch.GetElapsedTime(start);
+            // Metrics are updated only after SQLite transaction commit.
+            // This path never labels a counter with a device/student/event key.
+            if (result == AttendanceWriteResult.Inserted)
+            {
+                OperationalMetrics.RecordInserted(elapsed);
+                return GatewayOutcome.Inserted;
+            }
+            OperationalMetrics.RecordReplay(elapsed);
+            return GatewayOutcome.Duplicate;
         }
         catch (InvalidOperationException error)
         {

@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using AttendanceSystem.Database;
 using AttendanceSystem.AdminUi;
+using AttendanceSystem.Operations;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -128,6 +129,21 @@ public static class AdminApiServer
         AdminUiAssets.MapRoutes(app);
         app.MapGet("/api/v1/health/live", () => Results.Ok(new { alive = true }))
             .AllowAnonymous();
+
+        // Only the public boolean is exposed; no DB path, SQL errors, metrics
+        // or student/device identifiers are available to anonymous callers.
+        app.MapGet("/api/v1/health/ready", () =>
+        {
+            var readiness = OperationalHealth.Check(path);
+            return Results.Json(
+                new { ready = readiness.Ready },
+                statusCode: readiness.Ready ? StatusCodes.Status200OK :
+                    StatusCodes.Status503ServiceUnavailable);
+        }).AllowAnonymous();
+
+        app.MapGet("/api/v1/ops/status", () =>
+            Results.Ok(OperationalHealth.Check(path)))
+            .RequireAuthorization("Administrator");
 
         // Anonymous visitors see no status counts, names or attendance identifiers.
         app.MapGet("/api/v1/overview", () =>
