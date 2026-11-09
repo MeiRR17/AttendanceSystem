@@ -24,6 +24,7 @@ internal static class SyntheticMigrationEvidence
                 r.HolidayCount != 2 || !r.CloneOnly || !r.OriginalUnchanged ||
                 !r.PreMigrationBackupVerified ||
                 !r.RollbackToOriginalSchemaVerified ||
+                !r.SyntheticDualReviewVerified ||
                 r.RealDataUsed || r.ProductionMigrationAuthorized ||
                 r.Decision != "NO-GO"))
             throw new InvalidOperationException(

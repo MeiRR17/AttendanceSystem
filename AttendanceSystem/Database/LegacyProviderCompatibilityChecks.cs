@@ -66,18 +66,38 @@ internal static class LegacyProviderCompatibilityChecks
 
             // A recovery rehearsal must use a separate clone; it must never
             // modify the original 1.x fixture or authorize an actual upgrade.
+            using var testReviewers = new SyntheticMigrationApprovalTestSigners();
+            SyntheticMigrationApprovalSmokeChecks.Run(sha, schema, testReviewers);
+            var review = testReviewers.Sign(
+                testReviewers.NewRequest(sha, schema, DateTimeOffset.UtcNow));
+            var oneTimeRehearsalLedger = new SyntheticReviewNonceLedger();
+
             var rejectedReceipt = false;
             try
             {
-                SyntheticMigrationRehearsal.Run(path, new string('0', 64));
+                SyntheticMigrationRehearsal.Run(
+                    path, new string('0', 64), review,
+                    testReviewers.TrustedKeys, oneTimeRehearsalLedger);
             }
             catch (InvalidOperationException) { rejectedReceipt = true; }
             Check(rejectedReceipt, "wrong fixture digest rejects before any clone");
             Check(Directory.GetFiles(directory, "rehearsal-*.db").Length == 0,
                   "invalid fixture receipt created no clone");
 
-            var recovery = SyntheticMigrationRehearsal.Run(path, sha);
+            var recovery = SyntheticMigrationRehearsal.Run(
+                path, sha, review, testReviewers.TrustedKeys,
+                oneTimeRehearsalLedger);
             receipts.Add(recovery);
+
+            var replayDenied = false;
+            try
+            {
+                SyntheticMigrationRehearsal.Run(
+                    path, sha, review, testReviewers.TrustedKeys,
+                    oneTimeRehearsalLedger);
+            }
+            catch (InvalidOperationException) { replayDenied = true; }
+            Check(replayDenied, "same signed approval cannot start a second rehearsal");
             Check(recovery.Format == "attendance-synthetic-migration-rehearsal-v1" &&
                   recovery.OriginalSchema == schema &&
                   recovery.TargetSchema == DatabaseSetup.CurrentSchemaVersion &&
@@ -88,6 +108,7 @@ internal static class LegacyProviderCompatibilityChecks
                   recovery.OriginalUnchanged &&
                   recovery.PreMigrationBackupVerified &&
                   recovery.RollbackToOriginalSchemaVerified &&
+                  recovery.SyntheticDualReviewVerified &&
                   !recovery.RealDataUsed &&
                   !recovery.ProductionMigrationAuthorized &&
                   recovery.Decision == "NO-GO",
