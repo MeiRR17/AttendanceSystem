@@ -79,7 +79,7 @@ jobs:
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test
       - name: SQLite migration, public bypass denial, test fixture path and dedup checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-db
-      - name: Synthetic detached signed audit checkpoint, deletion/rollback/tamper denial and SQLite recovery
+      - name: Synthetic detached signed audit checkpoint, deletion rollback tamper denial and SQLite recovery
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -132,7 +132,21 @@ jobs:
                   $checkpoint.purpose -ne "synthetic-recovery-audit-checkpoint-only" -or
                   $checkpoint.sourceSchemaVersion -ne $schema -or
                   $checkpoint.entries -ne 2 -or
-                  $checkpoint.headHash -notmatch '^[A-F0-9]{64} Join-Path $env:RUNNER_TEMP "attendance-rc6-migration-evidence"
+                  $checkpoint.headHash -notmatch '^[A-F0-9]{64}$' -or
+                  $checkpoint.signatureBase64 -eq "" -or
+                  $checkpoint.syntheticOnly -ne $true -or
+                  $checkpoint.productionAuthorized -ne $false -or
+                  $checkpoint.decision -ne "NO-GO") {
+                throw 'Detached audit checkpoint has an unsafe or incomplete contract.'
+              }
+              $publicKey = [Convert]::FromBase64String($checkpoint.testPublicKeySpkiBase64)
+              $fingerprint = [Convert]::ToHexString(
+                [System.Security.Cryptography.SHA256]::HashData($publicKey))
+              if ($fingerprint -ne $checkpoint.testKeyFingerprint) {
+                throw 'Synthetic checkpoint public-key fingerprint mismatch.'
+              }
+            }
+            $artifactOutput = Join-Path $env:RUNNER_TEMP "attendance-rc6-migration-evidence"
             New-Item -ItemType Directory -Path $artifactOutput -ErrorAction Stop | Out-Null
             Copy-Item -LiteralPath $manifest -Destination $artifactOutput
             Copy-Item -LiteralPath $checksums -Destination $artifactOutput
@@ -157,84 +171,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: attendance-rc10-detached-audit-no-go-${{ github.run_id }}
-          path: ${{ runner.temp }}/attendance-rc6-migration-evidence/
-          if-no-files-found: error
-          retention-days: 7
-      - name: Authenticated bridge synthetic 1000-event and negative checks
-        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-bridge
-      - name: Attendance policy, Israel DST, audit and offline Hebcal fixture checks
-        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-rules
-      - name: Consent-gated offline notification outbox smoke
-        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-outbox
-      - name: Synthetic OIDC JWT RBAC and append-only correction HTTP checks
-        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-api
-      - name: Hebrew RTL UI localhost and security smoke
-        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-ui
-      - name: Check browser JavaScript syntax
-        run: node --check AttendanceSystem/AdminUi/app.js
-      - name: Offline SQLite failure injection and operational metrics smoke
-        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-faults
-      - name: Synthetic staging preflight (no credentials or live device)
-        shell: pwsh
-        run: ./deploy/staging/preflight.ps1 -SyntheticOnly
-      - name: AES-256-GCM encrypted SQLite backup and restore synthetic checks
-        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-snapshots
-      - name: Two-week pilot evidence gate synthetic checks
-        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-pilot
-      - name: Release governance fail-closed smoke
-        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-release
-      - name: Produce source-only unsigned NO-GO release candidate evidence
-        shell: pwsh
-        env:
-          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          ./deploy/release/create-rc-evidence.ps1 -SyntheticOnly -ExpectedHeadSha $env:EXPECTED_SOURCE_SHA -OutputDirectory (Join-Path $env:RUNNER_TEMP 'attendance-rc-evidence')
-          ./deploy/release/verify-rc-evidence.ps1 -SyntheticOnly -ExpectedHeadSha $env:EXPECTED_SOURCE_SHA -EvidenceDirectory (Join-Path $env:RUNNER_TEMP 'attendance-rc-evidence')
-      - name: Upload unsigned NO-GO source evidence (not release binaries)
-        uses: actions/upload-artifact@v4
-        with:
-          name: attendance-v1-rc-no-go-source-evidence-${{ github.run_id }}
-          path: ${{ runner.temp }}/attendance-rc-evidence/
-          if-no-files-found: error
-          retention-days: 7
-      - name: Verify safe startup configuration
-        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --check-config
-      - name: Verify disabled-by-default startup
-        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build
- -or
-                  $checkpoint.signatureBase64 -eq "" -or
-                  $checkpoint.syntheticOnly -ne $true -or
-                  $checkpoint.productionAuthorized -ne $false -or
-                  $checkpoint.decision -ne "NO-GO") {
-                throw 'Detached audit checkpoint has an unsafe or incomplete contract.'
-              }
-              # Public keys here are disposable CI TEST keys. This is consistency,
-              # not institutional PKI trust or an independently signed release.
-              $publicKey = [Convert]::FromBase64String($checkpoint.testPublicKeySpkiBase64)
-              $fingerprint = [Convert]::ToHexString(
-                [System.Security.Cryptography.SHA256]::HashData($publicKey))
-              if ($fingerprint -ne $checkpoint.testKeyFingerprint) {
-                throw 'Synthetic checkpoint public-key fingerprint mismatch.'
-              }
-            }
-            $artifactOutput = Join-Path $env:RUNNER_TEMP "attendance-rc6-migration-evidence"
-            New-Item -ItemType Directory -Path $artifactOutput -ErrorAction Stop | Out-Null
-            Copy-Item -LiteralPath $manifest -Destination $artifactOutput
-            Copy-Item -LiteralPath $checksums -Destination $artifactOutput
-          }
-          finally {
-            Remove-Item Env:ATTENDANCE_MIGRATION_EVIDENCE_DIR -ErrorAction SilentlyContinue
-            Remove-Item Env:ATTENDANCE_SYNTHETIC_FIXTURES -ErrorAction SilentlyContinue
-            Remove-Item Env:ATTENDANCE_LEGACY_FIXTURE_DIR -ErrorAction SilentlyContinue
-            if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
-            if (Test-Path -LiteralPath $evidence) {
-              Remove-Item -LiteralPath $evidence -Recurse -Force
-            }
-          }
-      - name: Upload synthetic-only SQLite recovery evidence (NOT production approval)
-        uses: actions/upload-artifact@v4
-        with:
-          name: attendance-rc9-offline-root-no-go-${{ github.run_id }}
           path: ${{ runner.temp }}/attendance-rc6-migration-evidence/
           if-no-files-found: error
           retention-days: 7
