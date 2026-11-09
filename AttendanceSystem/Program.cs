@@ -6,6 +6,7 @@ using AttendanceSystem.Notifications;
 using AttendanceSystem.AdminApi;
 using AttendanceSystem.AdminUi;
 using AttendanceSystem.Operations;
+using AttendanceSystem.Deployment;
 using System.Globalization;
 
 namespace AttendanceSystem;
@@ -82,9 +83,21 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length == 1 && args[0] == "--self-test-snapshots")
+            {
+                SyntheticSnapshotSmokeChecks.Run();
+                return 0;
+            }
+
+            if (args.Length == 1 && args[0] == "--self-test-pilot")
+            {
+                PilotEvidenceSmokeChecks.Run();
+                return 0;
+            }
+
             if (args.Length > 0 && (args.Length != 1 || args[0] != "--check-config"))
             {
-                Console.Error.WriteLine("Usage: AttendanceSystem [--check-config|--self-test|--self-test-db|--self-test-bridge|--self-test-rules|--self-test-outbox|--self-test-api|--self-test-ui|--self-test-faults|--preview-ui|--serve-bridge|--serve-admin-api]");
+                Console.Error.WriteLine("Usage: AttendanceSystem [--check-config|--self-test|--self-test-db|--self-test-bridge|--self-test-rules|--self-test-outbox|--self-test-api|--self-test-ui|--self-test-faults|--self-test-snapshots|--self-test-pilot|--preview-ui|--serve-bridge|--serve-admin-api]");
                 return 2;
             }
 

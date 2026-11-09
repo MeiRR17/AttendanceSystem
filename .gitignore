@@ -51,3 +51,9 @@ appsettings.Development.local.json
 **/*.pem
 **/*.key
 **/*.token
+
+# v0.10 staging encrypted backup artifacts and partially restored DBs
+**/*.attsnap
+**/*.attsnap.*
+**/*.partial-*
+**/*.restore-*
