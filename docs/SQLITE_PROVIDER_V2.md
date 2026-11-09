@@ -43,3 +43,8 @@ CI run on this **exact commit** must show:
 ## Native dependency source
 
 System.Data.SQLite 2.x requires a separate `e_sqlite3` library. The upstream maintainer recommends SourceGear.sqlite3 native package builds. SourceGear.sqlite3 3.53.4 is pinned rather than loading arbitrary DLLs from host PATH. This branch does not redistribute native vendor scanner SDK binaries or claim Realand compatibility. References: https://system.data.sqlite.org/home/info/3da85aab5b67862260f7d1f1eb5e033bc7e73ab8 and https://www.nuget.org/packages/SourceGear.sqlite3/3.53.4.
+
+
+## rc.3 follow-up
+
+Separate `tests/LegacyProviderFixture` generator builds with the old `System.Data.SQLite.Core 1.0.119` in a different .NET process, writes only two synthetic old-format files, and records their SHA256. The new v2 binary reads the exact files, refuses implicit schema upgrades, checks online backup and validates preservation of original legacy fields through explicit migration to v4. See [SQLITE_V1_COMPATIBILITY.md](SQLITE_V1_COMPATIBILITY.md). This does not prove compatibility with a real historical student database.

@@ -29,6 +29,12 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length == 1 && args[0] == "--self-test-legacy-compat")
+            {
+                LegacyProviderCompatibilityChecks.Run();
+                return 0;
+            }
+
             if (args.Length == 1 && args[0] == "--self-test-bridge")
             {
                 BridgeSmokeChecks.Run();
@@ -117,7 +123,7 @@ internal static class Program
 
             if (args.Length > 0 && (args.Length != 1 || args[0] != "--check-config"))
             {
-                Console.Error.WriteLine("Usage: AttendanceSystem [--check-config|--self-test|--self-test-db|--self-test-bridge|--self-test-rules|--self-test-outbox|--self-test-api|--self-test-ui|--self-test-faults|--self-test-snapshots|--self-test-pilot|--self-test-release|--assess-release|--preview-ui|--serve-bridge|--serve-admin-api]");
+                Console.Error.WriteLine("Usage: AttendanceSystem [--check-config|--self-test|--self-test-db|--self-test-legacy-compat|--self-test-bridge|--self-test-rules|--self-test-outbox|--self-test-api|--self-test-ui|--self-test-faults|--self-test-snapshots|--self-test-pilot|--self-test-release|--assess-release|--preview-ui|--serve-bridge|--serve-admin-api]");
                 return 2;
             }
 

@@ -15,9 +15,12 @@ on:
       - 'codex/v0.10.0-encrypted-backup-staging-pilot-20261109'
       - 'codex/v1.0.0-rc-evidence-no-go-20261109'
       - 'codex/v1.0.0-rc1-nuget-supply-chain-20261109'
+      - 'codex/v1.0.0-rc2-sqlite-2.0.4-migration-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
+      - 'tests/LegacyProviderFixture/**'
+      - 'docs/SQLITE_V1_COMPATIBILITY.md'
       - 'global.json'
       - '.github/workflows/manual-dotnet10-build.yml'
       - 'deploy/staging/**'
@@ -62,6 +65,25 @@ jobs:
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test
       - name: Synthetic SQLite migration, backup and dedup checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-db
+      - name: Legacy SQLite 1.x -> v2 native provider compatibility and non-loss
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = Join-Path ([IO.Path]::GetTempPath()) ("attendance-legacy-fixture-" + [guid]::NewGuid().ToString("N"))
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          try {
+            $env:ATTENDANCE_SYNTHETIC_FIXTURES = "true"
+            $env:ATTENDANCE_LEGACY_FIXTURE_DIR = $dir
+            dotnet run --project tests/LegacyProviderFixture/LegacyProviderFixture.csproj --configuration Release -- "$dir"
+            if ($LASTEXITCODE -ne 0) { throw 'Legacy provider 1.x fixture creation failed.' }
+            dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-legacy-compat
+            if ($LASTEXITCODE -ne 0) { throw 'SQLite v2 legacy compatibility check failed.' }
+          }
+          finally {
+            Remove-Item Env:ATTENDANCE_SYNTHETIC_FIXTURES -ErrorAction SilentlyContinue
+            Remove-Item Env:ATTENDANCE_LEGACY_FIXTURE_DIR -ErrorAction SilentlyContinue
+            if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
+          }
       - name: Authenticated bridge synthetic 1000-event and negative checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-bridge
       - name: Attendance policy, Israel DST, audit and offline Hebcal fixture checks
