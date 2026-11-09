@@ -1,4 +1,3 @@
-﻿using AttendanceSystem.Services;
 using System;
 
 namespace AttendanceSystem
@@ -12,10 +11,10 @@ namespace AttendanceSystem
             var realandSdk = new RealandSDK();
             realandSdk.InitializeWebSocketServer("2012");
 
-            var notificationService = new NotificationService();
-            notificationService.SendLateNotification("מאיר בן ציון דביר", "12345678", "+972535321275", DateTime.Now);
-
-            Console.WriteLine("Press any key to exit...");
+            // Do not send demonstration WhatsApp messages at startup.
+            // Notifications will be driven by validated attendance decisions
+            // after consent and delivery safeguards have been implemented.
+            Console.WriteLine("Attendance prototype started. Press any key to exit...");
             Console.ReadKey();
         }
     }
