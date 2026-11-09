@@ -1,26 +1,16 @@
-﻿namespace AttendanceSystem.Services
+namespace AttendanceSystem.Services;
+
+/// <summary>
+/// Retired unsafe prototype service: Sunday and arbitrary Hebcal observances
+/// were incorrectly classified as non-study days. Use policy versioning and
+/// explicit authorized date overrides through AttendanceRuleEngine.
+/// </summary>
+[Obsolete("Use AttendanceSystem.Rules.AttendanceRuleEngine with approved policy.")]
+public static class HolidayChecker
 {
-    public static class HolidayChecker
-    {
-        private static List<DateTime> holidays = new List<DateTime>();
+    public static Task InitializeHolidays() => Task.CompletedTask;
 
-        public static async Task InitializeHolidays()
-        {
-            int currentYear = DateTime.Now.Year;
-            holidays = await HolidayFetcher.GetHebrewHolidays(currentYear);
-        }
-
-        public static bool IsWeekendOrHoliday(DateTime date)
-        {
-            if (date.DayOfWeek == DayOfWeek.Friday || date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday)
-            {
-                return true;
-            }
-            if (holidays.Contains(date.Date))
-            {
-                return true;
-            }
-            return false;
-        }
-    }
+    public static bool IsWeekendOrHoliday(DateTime date) =>
+        throw new NotSupportedException(
+            "Legacy holiday logic was removed: study days must be configured by the institution.");
 }

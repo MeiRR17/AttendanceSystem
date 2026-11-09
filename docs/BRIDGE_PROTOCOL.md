@@ -52,7 +52,7 @@ On retry, sign with a fresh forwarding timestamp but retain original EventKey an
 
 The smoke suite creates a temporary DB and random secret in memory, inserts 1000 synthetic events, replays all 1000, checks the exact event count, and verifies rejection of bad signatures, wrong device, old signed envelopes, DTD/XXE, malformed/oversized XML, unexpected personal fields, future clock, conflicting event key and disabled device. It never contacts a scanner, network endpoint or WhatsApp. Parent versions also test migration and safe startup.
 
-CI verifies authentication, SQLite idempotency and an actual in-process Kestrel loopback HTTP round trip (insert, duplicate, bad signature, malformed body, wrong content type). This still does not validate Realand hardware, TLS/WSS, networking outside localhost or a physical scanner's acknowledgment protocol.
+CI verifies the core authentication and SQLite boundary, not yet a full Kestrel transport integration test. No physical-device or public-network readiness is claimed.
 
 ## Remaining gates
 
