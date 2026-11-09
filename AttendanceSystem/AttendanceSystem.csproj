@@ -17,6 +17,11 @@
     <PackageReference Include="Zmanim" Version="1.5.0" />
   </ItemGroup>
 
+  <!-- ASP.NET Core Kestrel from the .NET shared framework. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <!-- Legacy SDK references now resolve within the checkout, not a developer's Downloads folder. -->
   <!-- Legacy SDK binary licensing / .NET 10 runtime compatibility are NOT yet verified. -->
   <ItemGroup>

@@ -1,5 +1,6 @@
 using AttendanceSystem.Runtime;
 using AttendanceSystem.Database;
+using AttendanceSystem.Gateway;
 using System.Globalization;
 
 namespace AttendanceSystem;
@@ -22,9 +23,21 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length == 1 && args[0] == "--self-test-bridge")
+            {
+                BridgeSmokeChecks.Run();
+                return 0;
+            }
+
+            if (args.Length == 1 && args[0] == "--serve-bridge")
+            {
+                BridgeServer.RunAsync().GetAwaiter().GetResult();
+                return 0;
+            }
+
             if (args.Length > 0 && (args.Length != 1 || args[0] != "--check-config"))
             {
-                Console.Error.WriteLine("Usage: AttendanceSystem [--check-config|--self-test|--self-test-db]");
+                Console.Error.WriteLine("Usage: AttendanceSystem [--check-config|--self-test|--self-test-db|--self-test-bridge|--serve-bridge]");
                 return 2;
             }
 
