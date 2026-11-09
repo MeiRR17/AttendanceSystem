@@ -1,21 +1,32 @@
-# Exclude the .vs directory
+# IDE / local tooling
 .vs/
-
-# Exclude build outputs
-bin/
-obj/
-
-# Exclude other temporary files
 *.user
-*.log
-*.tlog
+*.suo
+*.userosscache
+*.sln.docstates
+# .NET build outputs
+**/bin/
+**/obj/
 *.pdb
 *.cache
+*.tlog
 *.ilk
 *.ipch
 *.aps
 *.ncb
-*.suo
 *.sdf
 *.opensdf
-*.tlog
+# Attendance data and SQLite journal files (never commit real records)
+**/attendance.db
+**/attendance.db-*
+**/attendance.db-journal
+**/attendance.db-wal
+**/attendance.db-shm
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+secrets.json
+appsettings.Development.local.json
+*.key
+*.pfx
