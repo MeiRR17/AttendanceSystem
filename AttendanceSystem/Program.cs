@@ -2,6 +2,7 @@ using AttendanceSystem.Runtime;
 using AttendanceSystem.Database;
 using AttendanceSystem.Gateway;
 using AttendanceSystem.Rules;
+using AttendanceSystem.Notifications;
 using System.Globalization;
 
 namespace AttendanceSystem;
@@ -42,9 +43,15 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length == 1 && args[0] == "--self-test-outbox")
+            {
+                NotificationOutboxSmokeChecks.Run();
+                return 0;
+            }
+
             if (args.Length > 0 && (args.Length != 1 || args[0] != "--check-config"))
             {
-                Console.Error.WriteLine("Usage: AttendanceSystem [--check-config|--self-test|--self-test-db|--self-test-bridge|--self-test-rules|--serve-bridge]");
+                Console.Error.WriteLine("Usage: AttendanceSystem [--check-config|--self-test|--self-test-db|--self-test-bridge|--self-test-rules|--self-test-outbox|--serve-bridge]");
                 return 2;
             }
 

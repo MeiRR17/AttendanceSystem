@@ -10,7 +10,7 @@ namespace AttendanceSystem.Database;
 /// </summary>
 public static class DatabaseSetup
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     public static void InitializeDatabase()
     {
@@ -121,6 +121,58 @@ public static class DatabaseSetup
             RecordMigration(connection, transaction, 2);
         }
 
+        if (version < 3)
+        {
+            // No real phone numbers, names, message bodies or Twilio secrets in outbox tables.
+            Execute(connection, transaction, """
+                CREATE TABLE IF NOT EXISTS NotificationConsents (
+                    RecipientKey TEXT NOT NULL,
+                    Purpose TEXT NOT NULL,
+                    IsGranted INTEGER NOT NULL CHECK(IsGranted IN (0, 1)),
+                    EvidenceRef TEXT NOT NULL,
+                    ChangedAtUtc TEXT NOT NULL,
+                    PRIMARY KEY (RecipientKey, Purpose)
+                );
+                CREATE TABLE IF NOT EXISTS NotificationTemplates (
+                    TemplateKey TEXT NOT NULL PRIMARY KEY,
+                    Purpose TEXT NOT NULL,
+                    ApprovalEvidenceRef TEXT NOT NULL,
+                    IsEnabled INTEGER NOT NULL DEFAULT 0 CHECK(IsEnabled IN (0, 1))
+                );
+                CREATE TABLE IF NOT EXISTS NotificationOutbox (
+                    OutboxID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EventID INTEGER NOT NULL REFERENCES AttendanceEvents(EventID),
+                    RecipientKey TEXT NOT NULL,
+                    Purpose TEXT NOT NULL,
+                    TemplateKey TEXT NOT NULL REFERENCES NotificationTemplates(TemplateKey),
+                    RuleVersion TEXT NOT NULL,
+                    Status TEXT NOT NULL CHECK(
+                        Status IN ('Queued','Leased','Retry','Simulated','Suppressed',
+                                   'DeadLetter','Uncertain')
+                    ),
+                    AttemptCount INTEGER NOT NULL DEFAULT 0,
+                    NextAttemptUtc TEXT NOT NULL,
+                    LeaseToken TEXT,
+                    LeaseUntilUtc TEXT,
+                    LastResultCode TEXT,
+                    CreatedAtUtc TEXT NOT NULL,
+                    UpdatedAtUtc TEXT NOT NULL,
+                    UNIQUE(EventID, RecipientKey, Purpose, TemplateKey, RuleVersion)
+                );
+                CREATE INDEX IF NOT EXISTS IX_NotificationOutbox_Status_Due
+                    ON NotificationOutbox(Status, NextAttemptUtc);
+                CREATE TABLE IF NOT EXISTS NotificationAttempts (
+                    AttemptID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    OutboxID INTEGER NOT NULL REFERENCES NotificationOutbox(OutboxID),
+                    AttemptNo INTEGER NOT NULL,
+                    ResultCode TEXT NOT NULL,
+                    RecordedAtUtc TEXT NOT NULL,
+                    UNIQUE(OutboxID, AttemptNo)
+                );
+                """);
+            RecordMigration(connection, transaction, 3);
+        }
+
         transaction.Commit();
         AssertRequiredTables(connection);
     }
@@ -160,7 +212,9 @@ public static class DatabaseSetup
     {
         foreach (var tableName in new[]
                  { "Students", "Attendance", "Holidays", "Devices", "AttendanceEvents",
-                   "AttendanceDecisions", "Schedules", "AuditEvents", "SchemaMigrations" })
+                   "AttendanceDecisions", "Schedules", "AuditEvents", "SchemaMigrations",
+                   "NotificationConsents", "NotificationTemplates", "NotificationOutbox",
+                   "NotificationAttempts" })
         {
             using var command = connection.CreateCommand();
             command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=@name;";

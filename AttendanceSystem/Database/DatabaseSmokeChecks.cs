@@ -19,7 +19,7 @@ public static class DatabaseSmokeChecks
             DatabaseSetup.InitializeDatabaseAtPath(clean);
             using (var db = DatabaseSetup.Open(clean))
             {
-                Check(DatabaseSetup.ReadVersion(db) == 2, "fresh schema version");
+                Check(DatabaseSetup.ReadVersion(db) == DatabaseSetup.CurrentSchemaVersion, "fresh schema version");
                 using var cmd = db.CreateCommand();
                 cmd.CommandText = """
                     INSERT INTO Devices (DeviceID, Enabled, RegisteredAtUtc)
@@ -66,7 +66,7 @@ public static class DatabaseSmokeChecks
             DatabaseSetup.InitializeDatabaseAtPath(legacy, allowExistingUpgrade: true);
             using (var db = DatabaseSetup.Open(legacy))
             {
-                Check(DatabaseSetup.ReadVersion(db) == 2, "legacy migrated schema");
+                Check(DatabaseSetup.ReadVersion(db) == DatabaseSetup.CurrentSchemaVersion, "legacy migrated schema");
                 using var cmd = db.CreateCommand();
                 cmd.CommandText = "SELECT COUNT(*) FROM Students WHERE StudentID='synthetic-legacy-id';";
                 Check(Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) == 1,
