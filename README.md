@@ -55,6 +55,7 @@ A scoped GitHub Actions pull-request workflow provides a clean Windows .NET 10 b
 - [v1.0.0-rc.7 dual-signed synthetic migration reviews (still NO-GO)](docs/SQLITE_SYNTHETIC_SIGNED_REVIEWS.md)
 - [v1.0.0-rc.8 synthetic reviewer key revocation and persistent replay tests](docs/SQLITE_REVIEWER_TRUST_AND_REPLAY.md)
 - [v1.0.0-rc.9 offline-root-signed synthetic trust policy and epoch rollback guard](docs/SQLITE_OFFLINE_ROOT_TRUST.md)
+- [v1.0.0-rc.10 detached ECDSA-signed synthetic audit checkpoints and tamper/rollback detection](docs/SQLITE_DETACHED_AUDIT_CHECKPOINTS.md)
 - [NO-GO change-control and support handoff template](docs/RELEASE_CHANGE_TEMPLATE.md)
 - [Production Go/No-Go checklist](docs/PRODUCTION_CHECKLIST.md)
 - [Version and issue tracker](https://github.com/MeiRR17/AttendanceSystem/issues/3)
