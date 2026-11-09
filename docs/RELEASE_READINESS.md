@@ -45,6 +45,7 @@ Output directory must be new or empty. Never upload the artifact to a public Rel
 | Operational deployment, TLS/monitoring/on-call | Localhost experiments only | BLOCKED P0 |
 | Three accountable owner signatures and approval record | Not provided/verified | BLOCKED P0 |
 | Reproducible signed executable, complete SBOM and v1.0.0 tag | Explicitly not generated until prior gates are met | BLOCKED |
+| Transitive NuGet vulnerability review | Windows CI reported NU1902/NU1903 for System.Data.SqlClient 4.8.1 and NU1904 for System.Drawing.Common 4.7.0 | BLOCKED: resolve dependency path or document reviewed remediation before production |
 
 **Decision: NO-GO.** The engineering code may be reviewed and tested on synthetic fixtures; it must not be connected to students, real recipients or an institutional scanner or promoted to production.
 

@@ -67,8 +67,9 @@ try {
     if ($entries.Count -lt 10) { throw 'Incomplete source file manifest.' }
     [xml]$project = Get-Content -LiteralPath (
         Join-Path $root 'AttendanceSystem/AttendanceSystem.csproj') -Raw
-    $packages = @($project.Project.ItemGroup.PackageReference |
-        Where-Object { $_ -ne $null } |
+    # Use XPath because most MSBuild ItemGroup elements do not contain
+    # PackageReference and StrictMode refuses absent dynamic properties.
+    $packages = @($project.SelectNodes('//PackageReference') |
         ForEach-Object { [ordered]@{ package = [string]$_.Include
                                      version = [string]$_.Version } } |
         Sort-Object { $_.package })
