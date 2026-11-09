@@ -47,7 +47,7 @@ internal static class SyntheticOfflineRootTrust
         // Construct the structurally validated policy BEFORE signing bytes:
         // a duplicate reviewer, invalid public key or an incorrect fingerprint
         // cannot be smuggled into the canonical payload.
-        SyntheticReviewerTrustPolicy policy;
+        SyntheticReviewerTrustPolicy? policy = null;
         try
         {
             policy = new SyntheticReviewerTrustPolicy(manifest.Reviewers);
