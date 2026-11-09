@@ -16,11 +16,13 @@ on:
       - 'codex/v1.0.0-rc-evidence-no-go-20261109'
       - 'codex/v1.0.0-rc1-nuget-supply-chain-20261109'
       - 'codex/v1.0.0-rc2-sqlite-2.0.4-migration-20261109'
+      - 'codex/v1.0.0-rc3-legacy-sqlite-compat-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
       - 'tests/LegacyProviderFixture/**'
       - 'docs/SQLITE_V1_COMPATIBILITY.md'
+      - 'docs/SQLITE_MIGRATION_PREFLIGHT.md'
       - 'global.json'
       - '.github/workflows/manual-dotnet10-build.yml'
       - 'deploy/staging/**'
@@ -65,7 +67,7 @@ jobs:
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test
       - name: Synthetic SQLite migration, backup and dedup checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-db
-      - name: Legacy SQLite 1.x -> v2 native provider compatibility and non-loss
+      - name: Legacy SQLite 1.x -> v2 compatibility, schema preflight, negative-control and non-loss
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
