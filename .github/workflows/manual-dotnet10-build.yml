@@ -11,11 +11,15 @@ on:
       - 'codex/v0.6.0-consent-outbox-dryrun-20261109'
       - 'codex/v0.7.0-oidc-rbac-corrections-20261109'
       - 'codex/v0.8.0-hebrew-rtl-admin-ui-20261109'
+      - 'codex/v0.9.0-observability-fault-injection-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
       - 'global.json'
       - '.github/workflows/manual-dotnet10-build.yml'
+      - 'deploy/staging/**'
+      - 'docs/STAGING_AND_PILOT.md'
+      - 'docs/PILOT_DAY_TEMPLATE.md'
   workflow_dispatch:
 
 permissions:
@@ -54,6 +58,13 @@ jobs:
         run: node --check AttendanceSystem/AdminUi/app.js
       - name: Offline SQLite failure injection and operational metrics smoke
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-faults
+      - name: Synthetic staging preflight (no credentials or live device)
+        shell: pwsh
+        run: ./deploy/staging/preflight.ps1 -SyntheticOnly
+      - name: AES-256-GCM encrypted SQLite backup and restore synthetic checks
+        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-snapshots
+      - name: Two-week pilot evidence gate synthetic checks
+        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-pilot
       - name: Verify safe startup configuration
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --check-config
       - name: Verify disabled-by-default startup
