@@ -15,10 +15,15 @@ Use a clean Windows x64 machine with the .NET 10 SDK (see global.json). Start wi
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --self-test-rules
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --self-test-outbox
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --self-test-api
+    dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --self-test-ui
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --check-config
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release
 
-The last command exits in safe mode: no listener, DB creation, scanner access, or Twilio message. To explore the unauthenticated loopback-only legacy gateway in an isolated local environment, follow docs/SDK_COMPATIBILITY.md. Never enable it with real devices/students.
+The last command exits in safe mode: no listener, DB creation, scanner access, or Twilio message.
+
+To preview the interactive synthetic Hebrew RTL UI (no database, JWT or hardware):
+    dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --preview-ui
+Open http://127.0.0.1:21814/app on that machine. This preview only binds localhost, not a production network service. To explore the unauthenticated loopback-only legacy gateway in an isolated local environment, follow docs/SDK_COMPATIBILITY.md. Never enable it with real devices/students.
 
 A scoped GitHub Actions pull-request workflow provides a clean Windows .NET 10 build and safe smoke checks when available; it can consume CI minutes. A separate manual dispatch trigger is defined for later use when the workflow resides on the default branch. No CI success is claimed.
 
@@ -31,6 +36,7 @@ A scoped GitHub Actions pull-request workflow provides a clean Windows .NET 10 b
 - [v0.5.0 configurable attendance policies, Israel calendar and audit](docs/ATTENDANCE_RULES.md)
 - [v0.6.0 consent-gated dry-run WhatsApp outbox](docs/WHATSAPP_OUTBOX.md)
 - [v0.7.0 OIDC bearer API, role policies and append-only corrections](docs/ADMIN_API_SECURITY.md)
+- [v0.8.0 Hebrew RTL admin and local synthetic preview](docs/ADMIN_UI.md)
 - [Production Go/No-Go checklist](docs/PRODUCTION_CHECKLIST.md)
 - [Version and issue tracker](https://github.com/MeiRR17/AttendanceSystem/issues/3)
 

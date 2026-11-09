@@ -18,6 +18,12 @@
     <PackageReference Include="Zmanim" Version="1.5.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="AdminUi/index.html" />
+    <EmbeddedResource Include="AdminUi/style.css" />
+    <EmbeddedResource Include="AdminUi/app.js" />
+  </ItemGroup>
+
   <!-- ASP.NET Core Kestrel from the .NET shared framework. -->
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

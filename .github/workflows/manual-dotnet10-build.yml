@@ -9,6 +9,7 @@ on:
       - 'codex/v0.4.0-authenticated-bridge-20261109'
       - 'codex/v0.5.0-policy-calendar-20261109'
       - 'codex/v0.6.0-consent-outbox-dryrun-20261109'
+      - 'codex/v0.7.0-oidc-rbac-corrections-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
@@ -46,6 +47,10 @@ jobs:
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-outbox
       - name: Synthetic OIDC JWT RBAC and append-only correction HTTP checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-api
+      - name: Hebrew RTL UI localhost and security smoke
+        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-ui
+      - name: Check browser JavaScript syntax
+        run: node --check AttendanceSystem/AdminUi/app.js
       - name: Verify safe startup configuration
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --check-config
       - name: Verify disabled-by-default startup

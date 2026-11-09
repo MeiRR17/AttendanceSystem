@@ -131,6 +131,15 @@ public static class AdminApiSmokeChecks
                 var staff = Token("Staff");
                 var viewer = Token("Viewer");
 
+                using (var res=await SendAsync(HttpMethod.Get,"/app"))
+                {
+                    Check(res.StatusCode==HttpStatusCode.OK,
+                          "public HTML shell contains no attendance data");
+                    var body=await res.Content.ReadAsStringAsync();
+                    Check(body.Contains("dir=\"rtl\"",StringComparison.Ordinal) &&
+                          !body.Contains("private-test-student",StringComparison.Ordinal),
+                          "public shell serves only static UI");
+                }
                 using (var res=await SendAsync(HttpMethod.Get,"/api/v1/overview"))
                     Check(res.StatusCode==HttpStatusCode.Unauthorized,"anonymous denied counts");
                 using (var res=await SendAsync(HttpMethod.Get,"/api/v1/overview",viewer))
@@ -149,6 +158,25 @@ public static class AdminApiSmokeChecks
                     var body=await res.Content.ReadAsStringAsync();
                     Check(!body.Contains("private-test-student",StringComparison.Ordinal),
                           "no student identifiers in API projection");
+                }
+                using (var res=await SendAsync(HttpMethod.Get,
+                    "/api/v1/corrections?limit=20",viewer))
+                    Check(res.StatusCode==HttpStatusCode.Forbidden,"viewer denied global audit");
+                using (var res=await SendAsync(HttpMethod.Get,
+                    "/api/v1/corrections?limit=20",staff))
+                    Check(res.StatusCode==HttpStatusCode.Forbidden,"staff denied global audit");
+                using (var res=await SendAsync(HttpMethod.Get,
+                    "/api/v1/corrections?limit=1000",admin))
+                    Check(res.StatusCode==HttpStatusCode.BadRequest,
+                          "global audit pagination bounded");
+                using (var res=await SendAsync(HttpMethod.Get,
+                    "/api/v1/corrections?limit=20",admin))
+                {
+                    Check(res.StatusCode==HttpStatusCode.OK,"admin global audit allowed");
+                    var body=await res.Content.ReadAsStringAsync();
+                    Check(!body.Contains("private-test-student",StringComparison.Ordinal) &&
+                          body.Contains("clock-skew",StringComparison.Ordinal),
+                          "global audit has approved reason, not student data");
                 }
                 using (var res=await SendAsync(HttpMethod.Get,
                     "/api/v1/events/1/corrections",staff))
