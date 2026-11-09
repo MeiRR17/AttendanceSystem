@@ -10,7 +10,7 @@ namespace AttendanceSystem.Database;
 /// </summary>
 public static class DatabaseSetup
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     public static void InitializeDatabase()
     {
@@ -173,6 +173,28 @@ public static class DatabaseSetup
             RecordMigration(connection, transaction, 3);
         }
 
+        if (version < 4)
+        {
+            // Manual corrections are append-only. Source AttendanceEvents and
+            // computed AttendanceDecisions are never rewritten by this migration.
+            Execute(connection, transaction, """
+                CREATE TABLE IF NOT EXISTS AttendanceCorrections (
+                    CorrectionID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EventID INTEGER NOT NULL REFERENCES AttendanceEvents(EventID),
+                    Revision INTEGER NOT NULL CHECK(Revision > 0),
+                    BeforeStatus TEXT NOT NULL,
+                    AfterStatus TEXT NOT NULL,
+                    ReasonCode TEXT NOT NULL,
+                    ActorHash TEXT NOT NULL,
+                    RecordedAtUtc TEXT NOT NULL,
+                    UNIQUE(EventID, Revision)
+                );
+                CREATE INDEX IF NOT EXISTS IX_AttendanceCorrections_Event_Revision
+                    ON AttendanceCorrections(EventID, Revision DESC);
+                """);
+            RecordMigration(connection, transaction, 4);
+        }
+
         transaction.Commit();
         AssertRequiredTables(connection);
     }
@@ -214,7 +236,7 @@ public static class DatabaseSetup
                  { "Students", "Attendance", "Holidays", "Devices", "AttendanceEvents",
                    "AttendanceDecisions", "Schedules", "AuditEvents", "SchemaMigrations",
                    "NotificationConsents", "NotificationTemplates", "NotificationOutbox",
-                   "NotificationAttempts" })
+                   "NotificationAttempts", "AttendanceCorrections" })
         {
             using var command = connection.CreateCommand();
             command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=@name;";

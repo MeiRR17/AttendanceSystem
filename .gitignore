@@ -40,3 +40,14 @@ appsettings.Development.local.json
 **/*.sqlite-wal
 **/*.sqlite-shm
 **/*.bak
+
+# Local OIDC client keys and identity configuration
+.env
+.env.*
+!*.env.example
+**/appsettings.Secrets.json
+**/*.pfx
+**/*.p12
+**/*.pem
+**/*.key
+**/*.token
