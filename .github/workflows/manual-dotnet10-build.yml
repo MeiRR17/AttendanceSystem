@@ -1,0 +1,29 @@
+name: Manual .NET 10 build and offline smoke checks
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - name: Check out source (no production data)
+        uses: actions/checkout@v4
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore dependencies
+        run: dotnet restore AttendanceSystem.sln
+      - name: Build Release
+        run: dotnet build AttendanceSystem.sln --configuration Release --no-restore
+      - name: Configuration smoke checks (no external integrations)
+        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test
+      - name: Verify safe startup configuration
+        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --check-config
+      - name: Verify disabled-by-default startup
+        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build
