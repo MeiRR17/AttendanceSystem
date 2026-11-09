@@ -67,17 +67,18 @@ internal static class LegacyProviderCompatibilityChecks
             // A recovery rehearsal must use a separate clone; it must never
             // modify the original 1.x fixture or authorize an actual upgrade.
             using var testReviewers = new SyntheticMigrationApprovalTestSigners();
-            SyntheticMigrationApprovalSmokeChecks.Run(sha, schema, testReviewers);
+            SyntheticMigrationApprovalSmokeChecks.Run(sha, schema, testReviewers, path);
             var review = testReviewers.Sign(
                 testReviewers.NewRequest(sha, schema, DateTimeOffset.UtcNow));
-            var oneTimeRehearsalLedger = new SyntheticReviewNonceLedger();
+            var oneTimeRehearsalLedger =
+                new SyntheticDurableReviewNonceLedger(path);
 
             var rejectedReceipt = false;
             try
             {
                 SyntheticMigrationRehearsal.Run(
                     path, new string('0', 64), review,
-                    testReviewers.TrustedKeys, oneTimeRehearsalLedger);
+                    testReviewers.TrustPolicy, oneTimeRehearsalLedger);
             }
             catch (InvalidOperationException) { rejectedReceipt = true; }
             Check(rejectedReceipt, "wrong fixture digest rejects before any clone");
@@ -85,7 +86,7 @@ internal static class LegacyProviderCompatibilityChecks
                   "invalid fixture receipt created no clone");
 
             var recovery = SyntheticMigrationRehearsal.Run(
-                path, sha, review, testReviewers.TrustedKeys,
+                path, sha, review, testReviewers.TrustPolicy,
                 oneTimeRehearsalLedger);
             receipts.Add(recovery);
 
@@ -93,11 +94,12 @@ internal static class LegacyProviderCompatibilityChecks
             try
             {
                 SyntheticMigrationRehearsal.Run(
-                    path, sha, review, testReviewers.TrustedKeys,
-                    oneTimeRehearsalLedger);
+                    path, sha, review, testReviewers.TrustPolicy,
+                    new SyntheticDurableReviewNonceLedger(path));
             }
             catch (InvalidOperationException) { replayDenied = true; }
-            Check(replayDenied, "same signed approval cannot start a second rehearsal");
+            Check(replayDenied,
+                  "signed approval replay blocked after persistent ledger reopen");
             Check(recovery.Format == "attendance-synthetic-migration-rehearsal-v1" &&
                   recovery.OriginalSchema == schema &&
                   recovery.TargetSchema == DatabaseSetup.CurrentSchemaVersion &&
@@ -109,10 +111,13 @@ internal static class LegacyProviderCompatibilityChecks
                   recovery.PreMigrationBackupVerified &&
                   recovery.RollbackToOriginalSchemaVerified &&
                   recovery.SyntheticDualReviewVerified &&
+                  recovery.DurableReviewLedgerUsed &&
                   !recovery.RealDataUsed &&
                   !recovery.ProductionMigrationAuthorized &&
                   recovery.Decision == "NO-GO",
                   "clone-only migration, backup and rollback are verified but NO-GO");
+            Check(File.Exists(Path.Combine(directory, "synthetic-review-nonces.db")),
+                  "durable synthetic replay ledger persisted during test");
             Check(Directory.GetFiles(directory, "rehearsal-*").Length == 0,
                   "rehearsal cleans up its disposable plaintext artifacts");
             using (var originalAfterRehearsal = DatabaseSetup.Open(path))

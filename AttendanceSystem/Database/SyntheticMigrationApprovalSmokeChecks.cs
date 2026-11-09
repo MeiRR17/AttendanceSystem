@@ -3,36 +3,47 @@ using System.Security.Cryptography;
 namespace AttendanceSystem.Database;
 
 /// <summary>
-/// All private signing keys are generated in memory at test time. They are
-/// neither institutional credentials nor persisted in source, logs or CI
-/// artifacts. A passing fixture signature cannot authorize real migration.
+/// Ephemeral test signers. Keys never exist in the shipping deployment,
+/// repository, environment secrets, GitHub artifacts or review receipts.
 /// </summary>
 internal sealed class SyntheticMigrationApprovalTestSigners : IDisposable
 {
     private readonly ECDsa privacy = ECDsa.Create(ECCurve.NamedCurves.nistP256);
     private readonly ECDsa operations = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+    private readonly SyntheticReviewerKey[] anchors;
 
-    internal IReadOnlyDictionary<string, byte[]> TrustedKeys { get; }
+    internal SyntheticReviewerTrustPolicy TrustPolicy => new(anchors);
 
     internal SyntheticMigrationApprovalTestSigners()
     {
-        TrustedKeys = new Dictionary<string, byte[]>(StringComparer.Ordinal)
-        {
-            [SyntheticMigrationApprovalGate.PrivacyRole] =
-                privacy.ExportSubjectPublicKeyInfo(),
-            [SyntheticMigrationApprovalGate.OperationsRole] =
-                operations.ExportSubjectPublicKeyInfo()
-        };
+        var at = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        anchors =
+        [
+            MakeKey(SyntheticMigrationApprovalGate.PrivacyRole, privacy, at),
+            MakeKey(SyntheticMigrationApprovalGate.OperationsRole, operations, at)
+        ];
     }
 
+    private static SyntheticReviewerKey MakeKey(string role, ECDsa signer, long now)
+    {
+        var publicKey = signer.ExportSubjectPublicKeyInfo();
+        return new SyntheticReviewerKey(
+            role, SyntheticReviewerTrustPolicy.Fingerprint(publicKey),
+            publicKey, now - 60, now + 1800, Revoked: false);
+    }
+
+    internal SyntheticReviewerTrustPolicy Alter(
+        string role, Func<SyntheticReviewerKey, SyntheticReviewerKey> change) =>
+        new(anchors.Select(k => k.Role == role ? change(k) : k).ToArray());
+
     internal SyntheticMigrationReviewRequest NewRequest(
-        string sourceSha, int sourceSchema, DateTimeOffset now)
+        string sha, int sourceSchema, DateTimeOffset now)
     {
         var issued = now.ToUnixTimeSeconds();
         return new SyntheticMigrationReviewRequest(
             Format: SyntheticMigrationApprovalGate.Format,
             Purpose: SyntheticMigrationApprovalGate.Purpose,
-            SourceSha256: sourceSha.ToUpperInvariant(),
+            SourceSha256: sha.ToUpperInvariant(),
             SourceSchemaVersion: sourceSchema,
             TargetSchemaVersion: DatabaseSetup.CurrentSchemaVersion,
             Nonce: Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
@@ -41,24 +52,28 @@ internal sealed class SyntheticMigrationApprovalTestSigners : IDisposable
     }
 
     internal SyntheticMigrationReviewEnvelope Sign(
-        SyntheticMigrationReviewRequest request) =>
-        new(request,
+        SyntheticMigrationReviewRequest request)
+    {
+        var privacyId = anchors[0].KeyId;
+        var opsId = anchors[1].KeyId;
+        return new(request,
         [
             new SyntheticMigrationEndorsement(
-                SyntheticMigrationApprovalGate.PrivacyRole,
+                SyntheticMigrationApprovalGate.PrivacyRole, privacyId,
                 privacy.SignData(
                     SyntheticMigrationApprovalGate.CanonicalMessage(
-                        request, SyntheticMigrationApprovalGate.PrivacyRole),
+                        request, SyntheticMigrationApprovalGate.PrivacyRole, privacyId),
                     HashAlgorithmName.SHA256,
                     DSASignatureFormat.IeeeP1363FixedFieldConcatenation)),
             new SyntheticMigrationEndorsement(
-                SyntheticMigrationApprovalGate.OperationsRole,
+                SyntheticMigrationApprovalGate.OperationsRole, opsId,
                 operations.SignData(
                     SyntheticMigrationApprovalGate.CanonicalMessage(
-                        request, SyntheticMigrationApprovalGate.OperationsRole),
+                        request, SyntheticMigrationApprovalGate.OperationsRole, opsId),
                     HashAlgorithmName.SHA256,
                     DSASignatureFormat.IeeeP1363FixedFieldConcatenation))
         ]);
+    }
 
     public void Dispose()
     {
@@ -70,56 +85,64 @@ internal sealed class SyntheticMigrationApprovalTestSigners : IDisposable
 internal static class SyntheticMigrationApprovalSmokeChecks
 {
     internal static void Run(
-        string actualSourceSha, int sourceSchema,
-        SyntheticMigrationApprovalTestSigners signers)
+        string sourceSha, int schema,
+        SyntheticMigrationApprovalTestSigners signers, string fixturePath)
     {
         var now = DateTimeOffset.UtcNow;
-        var request = signers.NewRequest(actualSourceSha, sourceSchema, now);
+        var request = signers.NewRequest(sourceSha, schema, now);
         var valid = signers.Sign(request);
-        var keys = signers.TrustedKeys;
+        var trust = signers.TrustPolicy;
 
-        void Reject(
-            SyntheticMigrationReviewEnvelope? candidate,
-            IReadOnlyDictionary<string, byte[]>? anchors = null)
+        void Reject(SyntheticMigrationReviewEnvelope? candidate,
+                    SyntheticReviewerTrustPolicy? policy = null,
+                    ISyntheticReviewNonceLedger? ledger = null)
         {
-            var denied = false;
+            var rejected = false;
             try
             {
                 SyntheticMigrationApprovalGate.VerifyAndConsume(
-                    candidate, actualSourceSha, sourceSchema,
-                    anchors ?? keys, new SyntheticReviewNonceLedger(), now);
+                    candidate, sourceSha, schema, policy ?? trust,
+                    ledger ?? new SyntheticReviewNonceLedger(), now);
             }
-            catch (InvalidOperationException) { denied = true; }
-            if (!denied)
+            catch (InvalidOperationException) { rejected = true; }
+            if (!rejected)
                 throw new InvalidOperationException(
-                    "Approval negative control incorrectly accepted.");
+                    "Synthetic review negative control incorrectly accepted.");
         }
 
         Reject(null);
-        Reject(valid with { Endorsements = [] }); // zero reviewers
-        Reject(valid with { Endorsements = [valid.Endorsements[0]] }); // one reviewer
+        Reject(valid with { Endorsements = [] });
+        Reject(valid with { Endorsements = [valid.Endorsements[0]] });
         Reject(valid with
         {
             Endorsements = [valid.Endorsements[0], valid.Endorsements[0]]
-        }); // duplicate reviewer cannot impersonate second reviewer
+        });
         Reject(valid with
         {
             Endorsements =
             [
                 new SyntheticMigrationEndorsement(
-                    "unknown-role", valid.Endorsements[0].Signature),
+                    "untrusted-role", valid.Endorsements[0].KeyId,
+                    valid.Endorsements[0].Signature),
                 valid.Endorsements[1]
             ]
         });
 
-        var modifiedSignature = (byte[])valid.Endorsements[0].Signature.Clone();
-        modifiedSignature[0] ^= 0x01;
+        var alteredSignature = (byte[])valid.Endorsements[0].Signature.Clone();
+        alteredSignature[0] ^= 0x01;
         Reject(valid with
         {
             Endorsements =
             [
-                new SyntheticMigrationEndorsement(
-                    SyntheticMigrationApprovalGate.PrivacyRole, modifiedSignature),
+                valid.Endorsements[0] with { Signature = alteredSignature },
+                valid.Endorsements[1]
+            ]
+        });
+        Reject(valid with
+        {
+            Endorsements =
+            [
+                valid.Endorsements[0] with { KeyId = valid.Endorsements[1].KeyId },
                 valid.Endorsements[1]
             ]
         });
@@ -127,8 +150,8 @@ internal static class SyntheticMigrationApprovalSmokeChecks
         Reject(signers.Sign(request with { SourceSha256 = new string('0', 64) }));
         Reject(signers.Sign(request with { SourceSchemaVersion = 99 }));
         Reject(signers.Sign(request with { TargetSchemaVersion = 3 }));
-        Reject(signers.Sign(request with { Purpose = "live-migration" }));
-        Reject(signers.Sign(request with { Nonce = "bad-nonce" }));
+        Reject(signers.Sign(request with { Purpose = "real-student-migration" }));
+        Reject(signers.Sign(request with { Nonce = "INVALID" }));
         Reject(signers.Sign(request with
         {
             IssuedAtUnixSeconds = now.ToUnixTimeSeconds() - 300,
@@ -144,35 +167,56 @@ internal static class SyntheticMigrationApprovalSmokeChecks
             ExpiresAtUnixSeconds = now.ToUnixTimeSeconds() + 3600
         }));
 
+        // A revoked key cannot authorize, even though its signature verifies.
+        Reject(valid, signers.Alter(
+            SyntheticMigrationApprovalGate.PrivacyRole,
+            key => key with { Revoked = true }));
+        Reject(valid, signers.Alter(
+            SyntheticMigrationApprovalGate.PrivacyRole,
+            key => key with { NotAfterUnixSeconds = now.ToUnixTimeSeconds() - 1 }));
+        Reject(valid, signers.Alter(
+            SyntheticMigrationApprovalGate.OperationsRole,
+            key => key with { NotBeforeUnixSeconds = now.ToUnixTimeSeconds() + 100 }));
+
+        // A new valid but not trust-pinned key cannot replace the operator.
         using (var stranger = ECDsa.Create(ECCurve.NamedCurves.nistP256))
         {
-            var wrongTrust = keys.ToDictionary(
-                kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
-            wrongTrust[SyntheticMigrationApprovalGate.OperationsRole] =
-                stranger.ExportSubjectPublicKeyInfo();
-            Reject(valid, wrongTrust);
+            var replacement = stranger.ExportSubjectPublicKeyInfo();
+            Reject(valid, signers.Alter(
+                SyntheticMigrationApprovalGate.OperationsRole,
+                key => key with
+                {
+                    SubjectPublicKeyInfo = replacement,
+                    KeyId = SyntheticReviewerTrustPolicy.Fingerprint(replacement)
+                }));
         }
 
-        // A valid pair is accepted once by the in-memory synthetic ledger,
-        // and the same signed nonce is denied on the next attempt.
-        var oneTime = new SyntheticReviewNonceLedger();
+        // In-memory test replay denial still works.
+        var memory = new SyntheticReviewNonceLedger();
         SyntheticMigrationApprovalGate.VerifyAndConsume(
-            valid, actualSourceSha, sourceSchema, keys, oneTime, now);
-        var reused = false;
-        try
-        {
-            SyntheticMigrationApprovalGate.VerifyAndConsume(
-                valid, actualSourceSha, sourceSchema, keys, oneTime, now);
-        }
-        catch (InvalidOperationException) { reused = true; }
-        if (!reused)
-            throw new InvalidOperationException(
-                "Synthetic approval nonce was accepted twice.");
+            valid, sourceSha, schema, trust, memory, now);
+        Reject(valid, trust, memory);
+
+        // NEW: survive independent ledger re-instantiation and file reopening.
+        var durable = new SyntheticDurableReviewNonceLedger(fixturePath);
+        var durableRequest = signers.Sign(
+            signers.NewRequest(sourceSha, schema, DateTimeOffset.UtcNow));
+        SyntheticMigrationApprovalGate.VerifyAndConsume(
+            durableRequest, sourceSha, schema, trust, durable, now);
+        var reopened = new SyntheticDurableReviewNonceLedger(fixturePath);
+        Reject(durableRequest, trust, reopened);
+
+        // A different nonce still works after reopening, proving the durable
+        // unique constraint does not block independent valid test reviews.
+        var distinct = signers.Sign(
+            signers.NewRequest(sourceSha, schema, DateTimeOffset.UtcNow));
+        SyntheticMigrationApprovalGate.VerifyAndConsume(
+            distinct, sourceSha, schema, trust, reopened, now);
 
         Console.WriteLine(
-            "Synthetic dual ECDSA-P256 review PASS: two ephemeral pinned keys, " +
-            "role separation, signed source/schema/expiry/purpose, bad signature, " +
-            "expiry, wrong key, one-reviewer, tamper and replay controls denied. " +
-            "All fixture approvals remain NO-GO for production.");
+            "Synthetic reviewer trust and durable replay PASS: key fingerprint, " +
+            "key revocation/expiry/future validity, wrong-key rotation, signed role/purpose, " +
+            "tamper, forged reviewer, expired approval and persisted SQLite nonce replay denied. " +
+            "Test signatures and durable ledger do not authorize production.");
     }
 }

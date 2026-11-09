@@ -17,8 +17,8 @@ internal static class SyntheticMigrationRehearsal
     internal static MigrationRehearsalReceipt Run(
         string sourcePath, string expectedOldProviderFileSha256,
         SyntheticMigrationReviewEnvelope signedSyntheticReview,
-        IReadOnlyDictionary<string, byte[]> trustedTestPublicKeys,
-        SyntheticReviewNonceLedger usedNonceLedger)
+        SyntheticReviewerTrustPolicy trustedTestReviewers,
+        SyntheticDurableReviewNonceLedger usedNonceLedger)
     {
         SyntheticMigrationScope.Demand(sourcePath);
         var sourceName = Path.GetFileName(sourcePath);
@@ -77,7 +77,7 @@ internal static class SyntheticMigrationRehearsal
                 // any clone, backup, or database migration is started.
                 SyntheticMigrationApprovalGate.VerifyAndConsume(
                     signedSyntheticReview, sourceHash, oldVersion,
-                    trustedTestPublicKeys, usedNonceLedger, DateTimeOffset.UtcNow);
+                    trustedTestReviewers, usedNonceLedger, DateTimeOffset.UtcNow);
 
                 using var output = DatabaseSetup.Open(clone, failIfMissing: false);
                 db.BackupDatabase(output, "main", "main", -1, null, 0);
@@ -151,6 +151,7 @@ internal static class SyntheticMigrationRehearsal
                 PreMigrationBackupVerified: true,
                 RollbackToOriginalSchemaVerified: true,
                 SyntheticDualReviewVerified: true,
+                DurableReviewLedgerUsed: true,
                 RealDataUsed: false,
                 ProductionMigrationAuthorized: false,
                 Decision: "NO-GO");
@@ -235,5 +236,5 @@ internal sealed record MigrationRehearsalReceipt(
     int StudentCount, int AttendanceCount, int HolidayCount,
     bool CloneOnly, bool OriginalUnchanged, bool PreMigrationBackupVerified,
     bool RollbackToOriginalSchemaVerified, bool SyntheticDualReviewVerified,
-    bool RealDataUsed,
+    bool DurableReviewLedgerUsed, bool RealDataUsed,
     bool ProductionMigrationAuthorized, string Decision);
