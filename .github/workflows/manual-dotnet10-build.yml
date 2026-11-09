@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - 'codex/v0.2.0-dotnet10-reproducible-gateway-20261109'
+      - 'codex/v0.3.0-safe-sqlite-events-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
@@ -34,6 +35,8 @@ jobs:
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test
       - name: Synthetic SQLite migration, backup and dedup checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-db
+      - name: Authenticated bridge synthetic 1000-event and negative checks
+        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-bridge
       - name: Verify safe startup configuration
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --check-config
       - name: Verify disabled-by-default startup
