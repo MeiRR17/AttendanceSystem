@@ -16,6 +16,7 @@ Use a clean Windows x64 machine with the .NET 10 SDK (see global.json). Start wi
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --self-test-outbox
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --self-test-api
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --self-test-ui
+    dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --self-test-faults
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --check-config
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release
 
@@ -37,8 +38,11 @@ A scoped GitHub Actions pull-request workflow provides a clean Windows .NET 10 b
 - [v0.6.0 consent-gated dry-run WhatsApp outbox](docs/WHATSAPP_OUTBOX.md)
 - [v0.7.0 OIDC bearer API, role policies and append-only corrections](docs/ADMIN_API_SECURITY.md)
 - [v0.8.0 Hebrew RTL admin and local synthetic preview](docs/ADMIN_UI.md)
+- [v0.9.0 operational health, metrics and offline fault campaign](docs/OPERATIONS_AND_FAULTS.md)
 - [Production Go/No-Go checklist](docs/PRODUCTION_CHECKLIST.md)
 - [Version and issue tracker](https://github.com/MeiRR17/AttendanceSystem/issues/3)
+
+Operational telemetry v0.9.0 adds loopback readiness (public coarse boolean), Administrator-only aggregate metrics and SQLite lock/rollback fault checks. Real device connectivity, alert delivery and pilot SLOs remain unverified.
 
 ## Existing critical blockers
 - Legacy Attendance INSERT/schema mismatch is bypassed: experimental scanner events are rejected, not written. New append-only AttendanceEvents tables are not connected to live scanner input until v0.4.0.

@@ -10,6 +10,7 @@ on:
       - 'codex/v0.5.0-policy-calendar-20261109'
       - 'codex/v0.6.0-consent-outbox-dryrun-20261109'
       - 'codex/v0.7.0-oidc-rbac-corrections-20261109'
+      - 'codex/v0.8.0-hebrew-rtl-admin-ui-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
@@ -51,6 +52,8 @@ jobs:
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-ui
       - name: Check browser JavaScript syntax
         run: node --check AttendanceSystem/AdminUi/app.js
+      - name: Offline SQLite failure injection and operational metrics smoke
+        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-faults
       - name: Verify safe startup configuration
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --check-config
       - name: Verify disabled-by-default startup
