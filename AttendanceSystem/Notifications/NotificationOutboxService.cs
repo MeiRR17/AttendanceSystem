@@ -136,14 +136,11 @@ public sealed class NotificationOutboxService
                 existing.Transaction = tx;
                 existing.CommandText = """
                     SELECT COUNT(*) FROM NotificationOutbox
-                    WHERE EventID=@event AND RecipientKey=@recipient AND
-                          Purpose=@purpose AND TemplateKey=@template AND RuleVersion=@rule;
+                    WHERE EventID=@event AND RecipientKey=@recipient AND Purpose=@purpose;
                     """;
                 existing.Parameters.AddWithValue("@event", eventId);
                 existing.Parameters.AddWithValue("@recipient", recipientKey);
                 existing.Parameters.AddWithValue("@purpose", LatePurpose);
-                existing.Parameters.AddWithValue("@template", templateKey);
-                existing.Parameters.AddWithValue("@rule", expectedRuleVersion);
                 if (Convert.ToInt32(existing.ExecuteScalar(), CultureInfo.InvariantCulture) > 0)
                     return EnqueueResult.Existing;
                 throw new InvalidOperationException("Recipient 24-hour notification cap reached.");
@@ -156,8 +153,7 @@ public sealed class NotificationOutboxService
                  NextAttemptUtc,CreatedAtUtc,UpdatedAtUtc)
             VALUES (@event,@recipient,@purpose,@template,@rule,'Queued',
                     @now,@now,@now)
-            ON CONFLICT(EventID,RecipientKey,Purpose,TemplateKey,RuleVersion)
-                DO NOTHING;
+            ON CONFLICT(EventID,RecipientKey,Purpose) DO NOTHING;
             """, ("@event", eventId), ("@recipient", recipientKey),
                   ("@purpose", LatePurpose), ("@template", templateKey),
                   ("@rule", expectedRuleVersion), ("@now", Stamp(now)));

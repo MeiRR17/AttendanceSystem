@@ -157,7 +157,7 @@ public static class DatabaseSetup
                     LastResultCode TEXT,
                     CreatedAtUtc TEXT NOT NULL,
                     UpdatedAtUtc TEXT NOT NULL,
-                    UNIQUE(EventID, RecipientKey, Purpose, TemplateKey, RuleVersion)
+                    UNIQUE(EventID, RecipientKey, Purpose)
                 );
                 CREATE INDEX IF NOT EXISTS IX_NotificationOutbox_Status_Due
                     ON NotificationOutbox(Status, NextAttemptUtc);

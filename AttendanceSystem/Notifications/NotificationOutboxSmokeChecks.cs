@@ -135,6 +135,21 @@ public static class NotificationOutboxSmokeChecks
 
             Check(outbox.GetStatusCounts().TryGetValue("Simulated",out var simulated) &&
                   simulated==1,"reports distinguish simulation from actual delivery");
+            // Even after the 24h rate-limit window, the same event must never
+            // produce another notification due to policy/template revision.
+            using (var db = DatabaseSetup.Open(path))
+            using (var cmd = db.CreateCommand())
+            {
+                cmd.CommandText = """
+                    UPDATE AttendanceDecisions SET RuleVersion='synthetic-rule-v2'
+                    WHERE EventID=1;
+                    """;
+                cmd.ExecuteNonQuery();
+            }
+            outbox.RegisterTemplate("template-2",true,"synthetic-new-approval",now.AddDays(2));
+            Check(outbox.EnqueueLate(1,"recipient-1","template-2","synthetic-rule-v2",
+                                     now.AddDays(2)) == EnqueueResult.Existing,
+                  "same event cannot be requeued by rule/template change");
             Check(Count(path,"NotificationOutbox")==6,"all logical events persisted");
             Check(Count(path,"AttendanceEvents")==7,"failures never roll back attendance");
 
