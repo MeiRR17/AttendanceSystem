@@ -12,12 +12,15 @@ on:
       - 'codex/v0.7.0-oidc-rbac-corrections-20261109'
       - 'codex/v0.8.0-hebrew-rtl-admin-ui-20261109'
       - 'codex/v0.9.0-observability-fault-injection-20261109'
+      - 'codex/v0.10.0-encrypted-backup-staging-pilot-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
       - 'global.json'
       - '.github/workflows/manual-dotnet10-build.yml'
       - 'deploy/staging/**'
+      - 'deploy/release/**'
+      - 'docs/RELEASE_*.md'
       - 'docs/STAGING_AND_PILOT.md'
       - 'docs/PILOT_DAY_TEMPLATE.md'
   workflow_dispatch:
@@ -30,8 +33,11 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 15
     steps:
-      - name: Check out source (no production data)
+      - name: Check out exact PR head (no production data)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - name: Install .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:
@@ -65,6 +71,22 @@ jobs:
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-snapshots
       - name: Two-week pilot evidence gate synthetic checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-pilot
+      - name: Release governance fail-closed smoke
+        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-release
+      - name: Produce source-only unsigned NO-GO release candidate evidence
+        shell: pwsh
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          ./deploy/release/create-rc-evidence.ps1 -SyntheticOnly -ExpectedHeadSha $env:EXPECTED_SOURCE_SHA -OutputDirectory (Join-Path $env:RUNNER_TEMP 'attendance-rc-evidence')
+          ./deploy/release/verify-rc-evidence.ps1 -SyntheticOnly -ExpectedHeadSha $env:EXPECTED_SOURCE_SHA -EvidenceDirectory (Join-Path $env:RUNNER_TEMP 'attendance-rc-evidence')
+      - name: Upload unsigned NO-GO source evidence (not release binaries)
+        uses: actions/upload-artifact@v4
+        with:
+          name: attendance-v1-rc-no-go-source-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/attendance-rc-evidence/
+          if-no-files-found: error
+          retention-days: 7
       - name: Verify safe startup configuration
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --check-config
       - name: Verify disabled-by-default startup

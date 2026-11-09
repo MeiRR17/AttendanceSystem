@@ -95,9 +95,29 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length == 1 && args[0] == "--self-test-release")
+            {
+                ReleaseGovernanceSmokeChecks.Run();
+                return 0;
+            }
+
+            if (args.Length == 1 && args[0] == "--assess-release")
+            {
+                // No external approvals can be claimed from the application.
+                // This is an offline NO-GO summary with no identifying data.
+                var report = ReleaseGovernanceGate.Evaluate(
+                    new string('0', 40), null);
+                Console.WriteLine("CANDIDATE=" + report.Candidate);
+                Console.WriteLine("DECISION=" + report.Decision);
+                Console.WriteLine("PRODUCTION_AUTHORIZED=false");
+                foreach (var requirement in report.MissingRequirements)
+                    Console.WriteLine("BLOCKER=" + requirement);
+                return 0;
+            }
+
             if (args.Length > 0 && (args.Length != 1 || args[0] != "--check-config"))
             {
-                Console.Error.WriteLine("Usage: AttendanceSystem [--check-config|--self-test|--self-test-db|--self-test-bridge|--self-test-rules|--self-test-outbox|--self-test-api|--self-test-ui|--self-test-faults|--self-test-snapshots|--self-test-pilot|--preview-ui|--serve-bridge|--serve-admin-api]");
+                Console.Error.WriteLine("Usage: AttendanceSystem [--check-config|--self-test|--self-test-db|--self-test-bridge|--self-test-rules|--self-test-outbox|--self-test-api|--self-test-ui|--self-test-faults|--self-test-snapshots|--self-test-pilot|--self-test-release|--assess-release|--preview-ui|--serve-bridge|--serve-admin-api]");
                 return 2;
             }
 
