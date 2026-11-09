@@ -12,6 +12,7 @@ Use a clean Windows x64 machine with the .NET 10 SDK (see global.json). Start wi
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --self-test
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --self-test-db
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --self-test-bridge
+    dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --self-test-rules
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --check-config
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release
 
@@ -25,13 +26,14 @@ A scoped GitHub Actions pull-request workflow provides a clean Windows .NET 10 b
 - [v0.2.0 build, SDK, configuration, limits and verification](docs/SDK_COMPATIBILITY.md)
 - [v0.3.0 SQLite migrations and synthetic tests](docs/DATA_MIGRATIONS.md)
 - [v0.4.0 authenticated localhost bridge and security model](docs/BRIDGE_PROTOCOL.md)
+- [v0.5.0 configurable attendance policies, Israel calendar and audit](docs/ATTENDANCE_RULES.md)
 - [Production Go/No-Go checklist](docs/PRODUCTION_CHECKLIST.md)
 - [Version and issue tracker](https://github.com/MeiRR17/AttendanceSystem/issues/3)
 
 ## Existing critical blockers
 - Legacy Attendance INSERT/schema mismatch is bypassed: experimental scanner events are rejected, not written. New append-only AttendanceEvents tables are not connected to live scanner input until v0.4.0.
 - Old SuperSocket 1.x SDK binaries are still present in the checkout and have unverified provenance, redistribution rights, modern .NET runtime compatibility and supported OS.
-- An HMAC-authenticated loopback bridge accepts synthetic/authorized messages and responds only after SQLite commit. Actual Realand firmware is NOT verified to support this contract. LAN device identity, real ACK/reconnect, hardware, privacy, outbox consent, admin UI and production deployment remain open.
+- Attendance rules are now independently configurable (weekdays, slots, overrides, Israel DST), with audited re-evaluation of derived decisions. No automatic absence decisions, live messaging, calendar-to-closure interpretation or institutional policy is shipped. An HMAC-authenticated loopback bridge accepts synthetic/authorized messages and responds only after SQLite commit. Actual Realand firmware is NOT verified to support this contract. LAN device identity, real ACK/reconnect, hardware, privacy, outbox consent, admin UI and production deployment remain open.
 - Git history previously contained an attendance.db artifact. Removing it from current HEAD did not erase old Git history, forks or clones. This public repository must not contain personal records, secrets or biometric data.
 
 Bridge startup is disabled unless explicitly requested with --serve-bridge and externally provisioned credentials. No startup demo WhatsApp send exists. All external messaging remains outside the safe runtime path until v0.6.0. SQLite smoke checks use only disposable synthetic databases; no production migration runs automatically.
