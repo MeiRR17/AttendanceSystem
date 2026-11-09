@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -158,6 +159,7 @@ internal static class SyntheticMigrationApprovalGate
         input.Length == length &&
         input.All(Uri.IsHexDigit);
 
+    [DoesNotReturn]
     private static void Deny() =>
         throw new InvalidOperationException(
             "Synthetic review verification failed; no migration permitted.");
