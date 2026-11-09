@@ -146,11 +146,10 @@ internal static class SyntheticMigrationApprovalSmokeChecks
 
         using (var stranger = ECDsa.Create(ECCurve.NamedCurves.nistP256))
         {
-            var wrongTrust = keys.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal)
-            {
-                [SyntheticMigrationApprovalGate.OperationsRole] =
-                    stranger.ExportSubjectPublicKeyInfo()
-            };
+            var wrongTrust = keys.ToDictionary(
+                kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+            wrongTrust[SyntheticMigrationApprovalGate.OperationsRole] =
+                stranger.ExportSubjectPublicKeyInfo();
             Reject(valid, wrongTrust);
         }
 
