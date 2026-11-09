@@ -126,10 +126,22 @@ internal sealed class SyntheticTrustEpochLedger
     internal SyntheticTrustEpochLedger(string fixturePath, bool negativeControls = false)
     {
         SyntheticMigrationScope.Demand(fixturePath);
+        // The v0 and v1 fictional fixtures are generated with *different*
+        // in-memory root keys. Each must keep its own independent synthetic
+        // epoch ledger to avoid treating the other's initial epoch as a fork.
+        // The caller cannot select arbitrary ledger namespaces or filenames.
+        var fixture = Path.GetFileName(fixturePath);
+        var suffix = fixture switch
+        {
+            "legacy-unversioned.db" => "schema0",
+            "legacy-schema-v1.db" => "schema1",
+            _ => throw new InvalidOperationException(
+                "Unknown synthetic root trust fixture.")
+        };
         path = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(fixturePath))!,
             negativeControls
-                ? "synthetic-root-epoch-negative.db"
-                : "synthetic-root-epoch.db");
+                ? "synthetic-root-epoch-negative-" + suffix + ".db"
+                : "synthetic-root-epoch-" + suffix + ".db");
         using var db = Open();
         using var setup = db.CreateCommand();
         setup.CommandText = """
