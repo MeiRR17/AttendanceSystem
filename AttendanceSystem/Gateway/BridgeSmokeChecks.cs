@@ -108,6 +108,10 @@ public static class BridgeSmokeChecks
         {
             Directory.Delete(folder, recursive: true);
         }
+
+        // Prove the actual localhost HTTP surface enforces auth and persistence ACK,
+        // not only the in-process gateway method.
+        BridgeHttpSmokeChecks.RunAsync().GetAwaiter().GetResult();
     }
 
     private static int Count(string path)

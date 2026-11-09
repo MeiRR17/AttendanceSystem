@@ -70,11 +70,18 @@ public static class BridgeServer
 
         var gateway = new AuthenticatedEventGateway(
             new AttendanceEventStore(databasePath), deviceId, secret);
-        var builder = WebApplication.CreateBuilder();
+        await using var app = CreateApp(gateway, port);
+        Console.WriteLine("Authorized bridge listening on loopback only. No Realand hardware support.");
+        await app.RunAsync();
+    }
+
+    internal static WebApplication CreateApp(AuthenticatedEventGateway gateway, int port)
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = Array.Empty<string>() });
         builder.Logging.ClearProviders(); // No private event content in framework request logs.
         builder.WebHost.ConfigureKestrel(options =>
         {
-            options.ListenLocalhost(port);
+            options.Listen(System.Net.IPAddress.Loopback, port);
             options.Limits.MaxRequestBodySize = BodyLimit;
         });
 
@@ -85,8 +92,10 @@ public static class BridgeServer
         {
             // Exact payload signed by the authorized localhost bridge.
             // Never accept device identity from the event XML itself.
-            if (!string.Equals(context.Request.ContentType, "application/xml",
-                               StringComparison.OrdinalIgnoreCase))
+            var mediaType = context.Request.ContentType?.Split(';', 2)[0].Trim();
+            if (!string.Equals(mediaType, "application/xml", StringComparison.OrdinalIgnoreCase) ||
+                (context.Request.ContentType!.Contains("charset=", StringComparison.OrdinalIgnoreCase) &&
+                 !context.Request.ContentType.Contains("charset=utf-8", StringComparison.OrdinalIgnoreCase)))
                 return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
 
             if (!long.TryParse(context.Request.Headers["X-Attendance-Timestamp"].ToString(),
@@ -145,7 +154,6 @@ public static class BridgeServer
             }
         });
 
-        Console.WriteLine("Authorized bridge listening on loopback only. No Realand hardware support.");
-        await app.RunAsync();
+        return app;
     }
 }
