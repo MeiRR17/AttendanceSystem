@@ -147,6 +147,53 @@ internal static class SyntheticAuditCheckpointVerifier
 
 internal static class SyntheticAuditCheckpointEvidence
 {
+    /// <summary>
+    /// Public disposable TEST keys are written only to a *separate* temporary
+    /// CI pin directory. They are deliberately NOT included in the uploaded
+    /// evidence: a signer cannot bootstrap institutional trust from its own
+    /// self-reported checkpoint.
+    /// </summary>
+    internal static void WriteWitnessTestPins(
+        string pinsDirectory, IReadOnlyDictionary<int, byte[]> publicKeys)
+    {
+        if (publicKeys.Count != 2 ||
+            !publicKeys.Keys.Order().SequenceEqual(new[] { 0, 1 }))
+            throw new InvalidOperationException("Expected two synthetic witness pins.");
+
+        var full = Path.GetFullPath(pinsDirectory);
+        var temp = Path.GetFullPath(Path.GetTempPath())
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var name = Path.GetFileName(full);
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!string.Equals(Path.GetDirectoryName(full), temp, comparison) ||
+            !name.StartsWith("attendance-rc11-witness-pins-", StringComparison.Ordinal) ||
+            name.Length != "attendance-rc11-witness-pins-".Length + 32 ||
+            !name["attendance-rc11-witness-pins-".Length..].All(Uri.IsHexDigit) ||
+            !Directory.Exists(full))
+            throw new InvalidOperationException("Synthetic witness pin location denied.");
+
+        var info = new DirectoryInfo(full);
+        if (info.LinkTarget is not null ||
+            info.Attributes.HasFlag(FileAttributes.ReparsePoint) ||
+            Directory.EnumerateFileSystemEntries(full).Any())
+            throw new InvalidOperationException("Synthetic witness pin directory must be empty.");
+
+        foreach (var schema in new[] { 0, 1 })
+        {
+            var spki = publicKeys[schema];
+            using var verifier = ECDsa.Create();
+            verifier.ImportSubjectPublicKeyInfo(spki, out var read);
+            if (read != spki.Length || verifier.KeySize != 256)
+                throw new InvalidOperationException("Invalid synthetic witness public key.");
+            using var target = new FileStream(
+                Path.Combine(full, "audit-checkpoint-schema" + schema + ".spki"),
+                FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            target.Write(spki);
+            target.Flush(flushToDisk: true);
+        }
+    }
+
     internal static void Write(
         string evidenceDirectory,
         IReadOnlyList<SyntheticSignedAuditCheckpoint> checkpoints)

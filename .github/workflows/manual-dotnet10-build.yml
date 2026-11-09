@@ -23,10 +23,12 @@ on:
       - 'codex/v1.0.0-rc7-dual-signed-synthetic-approvals-20261109'
       - 'codex/v1.0.0-rc8-reviewer-trust-durable-replay-20261109'
       - 'codex/v1.0.0-rc9-offline-root-trust-20261109'
+      - 'codex/v1.0.0-rc10-detached-signed-audit-checkpoints-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
       - 'tests/LegacyProviderFixture/**'
+      - 'tests/SyntheticEvidenceVerifier/**'
       - 'docs/SQLITE_V1_COMPATIBILITY.md'
       - 'docs/SQLITE_MIGRATION_PREFLIGHT.md'
       - 'docs/SQLITE_PUBLIC_UPGRADE_GATE.md'
@@ -35,6 +37,7 @@ on:
       - 'docs/SQLITE_REVIEWER_TRUST_AND_REPLAY.md'
       - 'docs/SQLITE_OFFLINE_ROOT_TRUST.md'
       - 'docs/SQLITE_DETACHED_AUDIT_CHECKPOINTS.md'
+      - 'docs/SQLITE_INDEPENDENT_WITNESS.md'
       - 'global.json'
       - '.github/workflows/manual-dotnet10-build.yml'
       - 'deploy/staging/**'
@@ -79,7 +82,7 @@ jobs:
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test
       - name: SQLite migration, public bypass denial, test fixture path and dedup checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-db
-      - name: Synthetic detached signed audit checkpoint, deletion rollback tamper denial and SQLite recovery
+      - name: Synthetic detached audit plus separate-process witness verification with private CI pin handoff
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -90,14 +93,23 @@ jobs:
             throw 'Migration evidence directory must start absent.'
           }
           New-Item -ItemType Directory -Path $evidence | Out-Null
+          $pins = Join-Path ([IO.Path]::GetTempPath()) ("attendance-rc11-witness-pins-" + [guid]::NewGuid().ToString("N"))
+          New-Item -ItemType Directory -Path $pins -ErrorAction Stop | Out-Null
           try {
             $env:ATTENDANCE_SYNTHETIC_FIXTURES = "true"
+            $env:ATTENDANCE_SYNTHETIC_WITNESS_PINS_DIR = $pins
             $env:ATTENDANCE_MIGRATION_EVIDENCE_DIR = $evidence
             $env:ATTENDANCE_LEGACY_FIXTURE_DIR = $dir
             dotnet run --project tests/LegacyProviderFixture/LegacyProviderFixture.csproj --configuration Release -- "$dir"
             if ($LASTEXITCODE -ne 0) { throw 'Legacy provider 1.x fixture creation failed.' }
             dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-legacy-compat
             if ($LASTEXITCODE -ne 0) { throw 'SQLite v2 legacy compatibility check failed.' }
+            # Separate .NET process has NO reference to application's SQLite,
+            # migration or signer code. Pins live outside uploaded evidence.
+            dotnet run --project tests/SyntheticEvidenceVerifier/SyntheticEvidenceVerifier.csproj --configuration Release -- --verify "$evidence" "$pins"
+            if ($LASTEXITCODE -ne 0) { throw 'Independent synthetic witness failed.' }
+            dotnet run --project tests/SyntheticEvidenceVerifier/SyntheticEvidenceVerifier.csproj --configuration Release --no-build -- --self-test "$evidence" "$pins"
+            if ($LASTEXITCODE -ne 0) { throw 'Synthetic witness negative controls failed.' }
             $manifest = Join-Path $evidence "migration-rehearsal.json"
             $checksums = Join-Path $evidence "SHA256SUMS.txt"
             if (-not (Test-Path $manifest) -or -not (Test-Path $checksums)) {
@@ -159,6 +171,10 @@ jobs:
             }
           }
           finally {
+            Remove-Item Env:ATTENDANCE_SYNTHETIC_WITNESS_PINS_DIR -ErrorAction SilentlyContinue
+            if (Test-Path -LiteralPath $pins) {
+              Remove-Item -LiteralPath $pins -Recurse -Force
+            }
             Remove-Item Env:ATTENDANCE_MIGRATION_EVIDENCE_DIR -ErrorAction SilentlyContinue
             Remove-Item Env:ATTENDANCE_SYNTHETIC_FIXTURES -ErrorAction SilentlyContinue
             Remove-Item Env:ATTENDANCE_LEGACY_FIXTURE_DIR -ErrorAction SilentlyContinue
@@ -170,7 +186,7 @@ jobs:
       - name: Upload synthetic-only SQLite recovery evidence (NOT production approval)
         uses: actions/upload-artifact@v4
         with:
-          name: attendance-rc10-detached-audit-no-go-${{ github.run_id }}
+          name: attendance-rc11-independent-witness-no-go-${{ github.run_id }}
           path: ${{ runner.temp }}/attendance-rc6-migration-evidence/
           if-no-files-found: error
           retention-days: 7
