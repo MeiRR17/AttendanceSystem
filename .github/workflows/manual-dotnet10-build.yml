@@ -13,6 +13,7 @@ on:
       - 'codex/v0.8.0-hebrew-rtl-admin-ui-20261109'
       - 'codex/v0.9.0-observability-fault-injection-20261109'
       - 'codex/v0.10.0-encrypted-backup-staging-pilot-20261109'
+      - 'codex/v1.0.0-rc-evidence-no-go-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
@@ -46,6 +47,16 @@ jobs:
         run: dotnet restore AttendanceSystem.sln
       - name: Build Release
         run: dotnet build AttendanceSystem.sln --configuration Release --no-restore
+      - name: Enforce transitive NuGet dependency removal and emit resolved graph
+        shell: pwsh
+        run: ./deploy/release/audit-resolved-nuget.ps1 -Project AttendanceSystem/AttendanceSystem.csproj -OutputDirectory (Join-Path $env:RUNNER_TEMP 'attendance-dependency-evidence')
+      - name: Upload resolved NuGet inventory (not a complete SBOM)
+        uses: actions/upload-artifact@v4
+        with:
+          name: attendance-nuget-resolved-no-go-${{ github.run_id }}
+          path: ${{ runner.temp }}/attendance-dependency-evidence/
+          if-no-files-found: error
+          retention-days: 7
       - name: Configuration smoke checks (no external integrations)
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test
       - name: Synthetic SQLite migration, backup and dedup checks
