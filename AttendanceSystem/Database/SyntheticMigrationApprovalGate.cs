@@ -39,7 +39,7 @@ internal sealed class SyntheticReviewNonceLedger : ISyntheticReviewNonceLedger
 {
     private readonly HashSet<string> consumed = new(StringComparer.Ordinal);
 
-    internal bool TryConsume(string key)
+    public bool TryConsume(string key)
     {
         lock (consumed)
             return consumed.Add(key);
