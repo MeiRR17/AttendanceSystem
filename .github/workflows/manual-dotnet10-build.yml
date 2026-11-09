@@ -19,6 +19,7 @@ on:
       - 'codex/v1.0.0-rc3-legacy-sqlite-compat-20261109'
       - 'codex/v1.0.0-rc4-legacy-schema-preflight-20261109'
       - 'codex/v1.0.0-rc5-explicit-synthetic-migration-gate-20261109'
+      - 'codex/v1.0.0-rc6-synthetic-migration-rehearsal-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
@@ -27,6 +28,7 @@ on:
       - 'docs/SQLITE_MIGRATION_PREFLIGHT.md'
       - 'docs/SQLITE_PUBLIC_UPGRADE_GATE.md'
       - 'docs/SQLITE_MIGRATION_REHEARSAL.md'
+      - 'docs/SQLITE_SYNTHETIC_SIGNED_REVIEWS.md'
       - 'global.json'
       - '.github/workflows/manual-dotnet10-build.yml'
       - 'deploy/staging/**'
@@ -71,7 +73,7 @@ jobs:
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test
       - name: SQLite migration, public bypass denial, test fixture path and dedup checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-db
-      - name: Legacy SQLite 1.x -> v2 clone-only migration, backup, rollback and non-loss
+      - name: ECDSA P256 dual synthetic review, replay denial and SQLite 1.x -> v2 clone-only rollback
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -99,7 +101,9 @@ jobs:
             if ($report.decision -ne "NO-GO" -or
                 $report.productionMigrationAuthorized -ne $false -or
                 $report.generatedDataOnly -ne $true -or
-                @($report.result).Count -ne 2) {
+                $report.signed -ne $false -or
+                @($report.result).Count -ne 2 -or
+                @($report.result | Where-Object { $_.syntheticDualReviewVerified -ne $true }).Count -ne 0) {
               throw 'Migration evidence does not have a safe NO-GO contract.'
             }
             $actual = (Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -124,7 +128,7 @@ jobs:
       - name: Upload synthetic-only SQLite recovery evidence (NOT production approval)
         uses: actions/upload-artifact@v4
         with:
-          name: attendance-rc6-rehearsal-no-go-${{ github.run_id }}
+          name: attendance-rc7-dual-review-no-go-${{ github.run_id }}
           path: ${{ runner.temp }}/attendance-rc6-migration-evidence/
           if-no-files-found: error
           retention-days: 7

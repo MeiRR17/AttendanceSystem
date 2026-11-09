@@ -15,7 +15,10 @@ internal static class SyntheticMigrationRehearsal
     private const int MaxFixtureBytes = 4 * 1024 * 1024;
 
     internal static MigrationRehearsalReceipt Run(
-        string sourcePath, string expectedOldProviderFileSha256)
+        string sourcePath, string expectedOldProviderFileSha256,
+        SyntheticMigrationReviewEnvelope signedSyntheticReview,
+        IReadOnlyDictionary<string, byte[]> trustedTestPublicKeys,
+        SyntheticReviewNonceLedger usedNonceLedger)
     {
         SyntheticMigrationScope.Demand(sourcePath);
         var sourceName = Path.GetFileName(sourcePath);
@@ -68,6 +71,13 @@ internal static class SyntheticMigrationRehearsal
                 if (Convert.ToInt64(marker.ExecuteScalar(), CultureInfo.InvariantCulture) != 4)
                     throw new InvalidOperationException(
                         "Rehearsal refuses non-generated source identifiers.");
+
+                // Two independent ECDSA P-256 fixture reviewers must sign the
+                // exact source hash, schema, nonce, purpose and expiry BEFORE
+                // any clone, backup, or database migration is started.
+                SyntheticMigrationApprovalGate.VerifyAndConsume(
+                    signedSyntheticReview, sourceHash, oldVersion,
+                    trustedTestPublicKeys, usedNonceLedger, DateTimeOffset.UtcNow);
 
                 using var output = DatabaseSetup.Open(clone, failIfMissing: false);
                 db.BackupDatabase(output, "main", "main", -1, null, 0);
@@ -140,6 +150,7 @@ internal static class SyntheticMigrationRehearsal
                 OriginalUnchanged: true,
                 PreMigrationBackupVerified: true,
                 RollbackToOriginalSchemaVerified: true,
+                SyntheticDualReviewVerified: true,
                 RealDataUsed: false,
                 ProductionMigrationAuthorized: false,
                 Decision: "NO-GO");
@@ -223,5 +234,6 @@ internal sealed record MigrationRehearsalReceipt(
     string Format, int OriginalSchema, int TargetSchema,
     int StudentCount, int AttendanceCount, int HolidayCount,
     bool CloneOnly, bool OriginalUnchanged, bool PreMigrationBackupVerified,
-    bool RollbackToOriginalSchemaVerified, bool RealDataUsed,
+    bool RollbackToOriginalSchemaVerified, bool SyntheticDualReviewVerified,
+    bool RealDataUsed,
     bool ProductionMigrationAuthorized, string Decision);
