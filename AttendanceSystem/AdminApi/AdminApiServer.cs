@@ -5,6 +5,7 @@ using System.Net;
 using System.Security.Claims;
 using System.Text.Json;
 using AttendanceSystem.Database;
+using AttendanceSystem.AdminUi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -114,11 +115,17 @@ public static class AdminApiServer
             context.Response.Headers["X-Content-Type-Options"] = "nosniff";
             context.Response.Headers["Referrer-Policy"] = "no-referrer";
             context.Response.Headers["Cache-Control"] = "no-store";
-            context.Response.Headers["Content-Security-Policy"] = "default-src 'none'";
+            // Static UI shell is public but has no records or embedded credentials.
+            // All API data endpoints remain protected by server JWT policies.
+            if (context.Request.Path.StartsWithSegments("/app"))
+                AdminUiAssets.ApplySecurityHeaders(context);
+            else
+                context.Response.Headers["Content-Security-Policy"] = "default-src 'none'";
             await next();
         });
         app.UseAuthentication();
         app.UseAuthorization();
+        AdminUiAssets.MapRoutes(app);
         app.MapGet("/api/v1/health/live", () => Results.Ok(new { alive = true }))
             .AllowAnonymous();
 
@@ -217,6 +224,17 @@ public static class AdminApiServer
                 return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
         }).RequireAuthorization("Staff");
+
+        app.MapGet("/api/v1/corrections", (HttpRequest request) =>
+        {
+            var raw = request.Query["limit"].ToString();
+            var limit = 50;
+            if (raw.Length > 0 &&
+                (!int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture,
+                               out limit) || limit is < 1 or > 100))
+                return Results.BadRequest(new { error = "invalid_pagination" });
+            return Results.Ok(new { items = store.RecentCorrections(limit) });
+        }).RequireAuthorization("Administrator");
 
         app.MapGet("/api/v1/events/{eventId:long}/corrections",
             (long eventId) =>

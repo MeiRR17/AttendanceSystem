@@ -153,6 +153,33 @@ public sealed class AttendanceAdminStore
             eventId, revision, before.Status, newStatus, reasonCode, actorHash, now);
     }
 
+    /// <summary>
+    /// Administrator-only at the HTTP boundary. Globally recent correction
+    /// history with bounded paging and opaque event/actor references.
+    /// </summary>
+    public IReadOnlyList<AttendanceCorrectionView> RecentCorrections(int limit = 50)
+    {
+        if (limit is < 1 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(limit));
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            SELECT EventID, Revision, BeforeStatus, AfterStatus, ReasonCode,
+                   ActorHash, RecordedAtUtc
+            FROM AttendanceCorrections
+            ORDER BY CorrectionID DESC LIMIT @limit;
+            """;
+        cmd.Parameters.AddWithValue("@limit", limit);
+        var items = new List<AttendanceCorrectionView>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            items.Add(new AttendanceCorrectionView(
+                reader.GetInt64(0), reader.GetInt64(1),
+                reader.GetString(2), reader.GetString(3), reader.GetString(4),
+                reader.GetString(5), reader.GetString(6)));
+        return items;
+    }
+
     public IReadOnlyList<AttendanceCorrectionView> Corrections(long eventId, int limit = 50)
     {
         if (eventId <= 0 || limit < 1 || limit > 100)

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>AttendanceSystem | ניהול נוכחות</title>
+  <link rel="stylesheet" href="/app/assets/style.css">
+  <script defer src="/app/assets/app.js"></script>
+</head>
+<body>
+<a href="#main" class="skip-link">דלג לתוכן הראשי</a>
+<div class="app-layout">
+  <aside class="sidebar" aria-label="תפריט המערכת">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">A</div>
+      <div><strong>AttendanceSystem</strong><span>ניהול נוכחות מוסדי</span></div>
+    </div>
+    <div class="environment"><span class="dot"></span><span id="environment-text">סביבת הדגמה בלבד</span></div>
+    <nav class="nav" aria-label="ניווט ראשי">
+      <button class="nav-item is-active" data-view="overview" aria-current="page"><span class="nav-glyph" aria-hidden="true">◫</span>סקירה כללית</button>
+      <button class="nav-item" data-view="events"><span class="nav-glyph" aria-hidden="true">≡</span>אירועי נוכחות</button>
+      <button class="nav-item" data-view="audit"><span class="nav-glyph" aria-hidden="true">↺</span>יומן תיקונים</button>
+      <button class="nav-item" data-view="system"><span class="nav-glyph" aria-hidden="true">⚙</span>מצב מערכת</button>
+    </nav>
+    <div class="side-bottom">
+      <div class="side-panel"><small>אבטחת מידע</small><p>אין בתצוגה זו שמות, טלפונים או מידע ביומטרי.</p></div>
+      <span class="build-label">v0.8.0 · Engineering Preview</span>
+    </div>
+  </aside>
+  <div class="main-column">
+    <header class="topbar">
+      <div class="breadcrumb" aria-label="מיקום נוכחי"><span>מערכת נוכחות</span><span aria-hidden="true">/</span><strong id="breadcrumb-view">סקירה כללית</strong></div>
+      <div class="top-actions">
+        <span class="status-indicator"><span class="dot"></span><span id="connection-state">נתונים סינתטיים</span></span>
+        <span class="avatar" aria-hidden="true">מ</span><span id="current-role">מצב הדגמה</span>
+      </div>
+    </header>
+    <main id="main" tabindex="-1">
+      <section class="page-heading">
+        <div><p class="eyebrow">ניהול ובקרה / ATTENDANCE</p><h1 id="page-title">סקירה כללית</h1><p id="page-subtitle" class="muted">תמונת מצב של אירועים מסווגים. כל הנתונים להמחשה בלבד.</p></div>
+        <div class="page-controls">
+          <label class="sr-only" for="mode-select">מקור נתונים</label>
+          <select id="mode-select" aria-label="מקור נתונים">
+            <option value="demo">הדגמה סינתטית</option>
+            <option value="api">API מקומי מאומת</option>
+          </select>
+          <button id="refresh-button" class="button outline" type="button">רענון</button>
+        </div>
+      </section>
+      <div id="alert" class="notice" role="status" aria-live="polite"><strong>סביבת הדגמה</strong> — אין כאן חיבור למכשירים או מידע אישי.</div>
+
+      <section id="api-connection" class="surface connection-panel" hidden aria-labelledby="connection-title">
+        <h2 id="connection-title">חיבור בדיקה ל־API מקומי</h2>
+        <p>למפתחים בלבד: הדבקת JWT קצר־מועד בזיכרון הדפדפן. אין שמירה באחסון מקומי ואין כניסה אוטומטית. רק API ב־localhost.</p>
+        <form id="token-form" class="connection-form">
+          <label for="bearer-token">Bearer JWT זמני</label>
+          <input id="bearer-token" type="password" autocomplete="off" spellcheck="false" placeholder="טוקן חתום מספק OIDC מורשה" required>
+          <button class="button primary" type="submit">התחבר ל־API</button>
+          <button class="button outline" id="disconnect" type="button">התנתק</button>
+        </form>
+      </section>
+
+      <section id="overview-view" class="view-section" aria-labelledby="overview-title">
+        <h2 class="sr-only" id="overview-title">סקירה ומדדים</h2>
+        <div class="kpi-grid">
+          <article class="kpi-card"><span>אירועים מסווגים</span><strong id="metric-total">—</strong><small>על בסיס אירועים מתועדים</small></article>
+          <article class="kpi-card"><span>הגעה בזמן</span><strong id="metric-on-time">—</strong><small>לפי כלל נוכחות נוכחי</small></article>
+          <article class="kpi-card"><span>אירועי איחור</span><strong id="metric-late">—</strong><small>לבדיקה ולטיפול מורשה</small></article>
+          <article class="kpi-card"><span>ללא סיווג</span><strong id="metric-unclassified">—</strong><small>לא מחושבת היעדרות אוטומטית</small></article>
+        </div>
+        <div class="two-col">
+          <article class="surface chart-surface" aria-labelledby="chart-title">
+            <div class="section-header"><div><span class="eyebrow">פילוח אירועים</span><h2 id="chart-title">התפלגות סטטוסים</h2></div><span class="muted small">ללא נתונים מזהים</span></div>
+            <div id="distribution" class="distribution" aria-label="התפלגות סטטוס נוכחות"></div>
+          </article>
+          <article class="surface activity-surface" aria-labelledby="activity-title">
+            <div class="section-header"><div><span class="eyebrow">פעולות במערכת</span><h2 id="activity-title">מצב תפעולי</h2></div></div>
+            <dl class="ops-list">
+              <div><dt>שער קליטת Realand</dt><dd>מושבת לאימות</dd></div>
+              <div><dt>שליחת הודעות WhatsApp</dt><dd>הדמיה בלבד</dd></div>
+              <div><dt>תיקונים ידניים</dt><dd id="ops-edit">לפי תפקיד</dd></div>
+              <div><dt>ייצוא נתונים אמיתיים</dt><dd>חסום עד אישור פרטיות</dd></div>
+            </dl>
+          </article>
+        </div>
+        <article class="surface">
+          <div class="section-header"><div><span class="eyebrow">רשומה אחרונה</span><h2>אירועי נוכחות אחרונים</h2></div><button class="text-button" type="button" data-view="events">לרשימה המלאה ←</button></div>
+          <div class="table-scroll"><table><thead><tr><th scope="col">מזהה אירוע</th><th scope="col">זמן האירוע</th><th scope="col">מצב</th><th scope="col">גרסה</th></tr></thead><tbody id="recent-rows"></tbody></table></div>
+        </article>
+      </section>
+
+      <section id="events-view" class="view-section" hidden aria-labelledby="events-title">
+        <div class="section-header"><div><p class="eyebrow">נתוני פעילות</p><h2 id="events-title">אירועי נוכחות</h2></div><span class="muted small">אין הצגת פרטים אישיים</span></div>
+        <div class="surface">
+          <div class="filters">
+            <div class="form-field"><label for="search-events">חיפוש מזהה אירוע</label><input id="search-events" inputmode="numeric" placeholder="לדוגמה: 1001"></div>
+            <div class="form-field"><label for="filter-status">סינון מצב</label><select id="filter-status"><option value="all">כל המצבים</option><option value="OnTime">בזמן</option><option value="Late">איחור</option><option value="Excused">פטור</option><option value="Unclassified">לא מסווג</option><option value="Invalid">לא תקין</option></select></div>
+            <button class="button outline demo-only" id="demo-csv" type="button">ייצוא CSV מדומה</button>
+          </div>
+          <div class="table-scroll"><table><thead><tr><th scope="col">מזהה</th><th scope="col">תאריך ושעה (UTC)</th><th scope="col">מצב נוכחות</th><th scope="col">גרסה</th><th scope="col">פעולה</th></tr></thead><tbody id="all-rows"></tbody></table></div>
+          <div id="events-empty" class="empty-state" hidden>לא נמצאו אירועים המתאימים לסינון.</div>
+          <div class="pagination"><span id="events-count">—</span><button id="load-more" class="button outline" type="button" hidden>טען עוד אירועים</button></div>
+        </div>
+      </section>
+
+      <section id="audit-view" class="view-section" hidden aria-labelledby="audit-title">
+        <div class="section-header"><div><p class="eyebrow">בקרה ושקיפות</p><h2 id="audit-title">יומן תיקונים</h2></div></div>
+        <div class="surface"><p class="muted">יומן תיקונים מפורט זמין למנהלים בלבד. במצב הדגמה מוצגים תיקונים סינתטיים.</p><div id="audit-list" class="audit-list"></div></div>
+      </section>
+
+      <section id="system-view" class="view-section" hidden aria-labelledby="system-title">
+        <div class="section-header"><div><p class="eyebrow">תצורה ואבטחה</p><h2 id="system-title">מצב מערכת</h2></div></div>
+        <div class="surface system-info">
+          <h3>גרסת תצוגת מנהל: 0.8.0</h3><p>ה־API המקומי אינו מערכת ייצור. אימות משתמשים ארגוני, הרשאות פרטניות, יבוא מכשירי Realand ואישורי פרטיות עדיין דורשים אימות.</p>
+          <dl class="ops-list"><div><dt>ממשק</dt><dd>עברית / RTL / תגובתי</dd></div><div><dt>הגבלת מידע</dt><dd>מזהי אירועים ומצב בלבד</dd></div><div><dt>ייצוא אמיתי</dt><dd>חסום בשרת</dd></div><div><dt>גישה לרשת</dt><dd>localhost בלבד</dd></div></dl>
+        </div>
+      </section>
+    </main>
+    <footer>AttendanceSystem · סביבת פיתוח ללא נתוני תלמידים אמיתיים</footer>
+  </div>
+</div>
+
+<dialog id="correction-dialog" aria-labelledby="dialog-title">
+  <form id="correction-form">
+    <div class="dialog-header"><div><p class="eyebrow">עדכון רשומת נוכחות</p><h2 id="dialog-title">תיקון אירוע</h2></div><button class="icon-button" id="dialog-close" type="button" aria-label="סגירת חלון התיקון">×</button></div>
+    <p id="dialog-context" class="muted"></p>
+    <input id="correction-event-id" type="hidden">
+    <input id="correction-revision" type="hidden">
+    <div class="form-field"><label for="correction-status">סטטוס מתוקן</label><select id="correction-status" required><option value="">בחר מצב</option><option value="OnTime">בזמן</option><option value="Late">איחור</option><option value="Excused">פטור מאושר</option><option value="Unclassified">לא מסווג</option><option value="Invalid">לא תקין</option></select></div>
+    <div class="form-field"><label for="correction-reason">סיבה מתועדת</label><select id="correction-reason" required><option value="">בחר סיבה</option><option value="clock-skew">סטייה בשעון המכשיר</option><option value="approved-excuse">אישור חריג</option><option value="duplicate-scan">סריקה כפולה</option><option value="manual-verification">אימות ידני</option><option value="administrative-correction">תיקון מנהלי</option></select></div>
+    <div class="dialog-actions"><button class="button outline" id="dialog-cancel" type="button">ביטול</button><button class="button primary" type="submit">שמור תיקון</button></div>
+  </form>
+</dialog>
+</body>
+</html>
