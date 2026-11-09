@@ -46,7 +46,21 @@ public static class DatabaseSetup
                 "Use an authorized upgrade process; never migrate a real student database in CI.");
 
         if (existed)
+        {
+            // Existing old layouts must match the known 0/1 schema exactly,
+            // BEFORE making a backup or attempting any DDL. Unknown columns,
+            // triggers, foreign keys, corrupt pages or orphaned references are
+            // a hard stop, even when allowExistingUpgrade is explicitly true.
+            if (version <= 1)
+            {
+                var inspection = LegacyMigrationPreflight.Inspect(connection);
+                if (!inspection.StructurallyCompatible)
+                    throw new InvalidOperationException(
+                        "Unsupported legacy database layout; migration blocked. " +
+                        "Use an approved isolated and sanitized investigation.");
+            }
             CreateSqliteBackup(connection, fullPath);
+        }
 
         using var transaction = connection.BeginTransaction();
         Execute(connection, transaction, """

@@ -49,6 +49,7 @@ A scoped GitHub Actions pull-request workflow provides a clean Windows .NET 10 b
 - [v1.0.0-rc.1 NuGet supply-chain reduction and fail-closed audit](docs/NUGET_SUPPLY_CHAIN.md)
 - [v1.0.0-rc.2 SQLite 2.0.4 provider migration and regression evidence](docs/SQLITE_PROVIDER_V2.md)
 - [v1.0.0-rc.3 legacy-provider 1.x file compatibility and data preservation](docs/SQLITE_V1_COMPATIBILITY.md)
+- [v1.0.0-rc.4 fail-closed schema preflight and negative migration controls](docs/SQLITE_MIGRATION_PREFLIGHT.md)
 - [NO-GO change-control and support handoff template](docs/RELEASE_CHANGE_TEMPLATE.md)
 - [Production Go/No-Go checklist](docs/PRODUCTION_CHECKLIST.md)
 - [Version and issue tracker](https://github.com/MeiRR17/AttendanceSystem/issues/3)
@@ -57,7 +58,7 @@ Operational telemetry v0.9.0 adds loopback readiness (public coarse boolean), Ad
 
 v0.10.0 includes a **synthetic-only**, internal AES-256-GCM snapshot/restore test foundation and a read-only pilot evidence validator that **cannot authorize production GO**. No secure Windows backup ACL/secret custody/offsite automation, physical device pilot or real data protection is approved. Run only isolated synthetic tests and reviewed staging preflight.
 
-v1.0.0-rc.1 removes unused Twilio and SQLite EF6 meta-package dependencies and adds a transitive NuGet security audit gate; v1.0.0-rc.2 switches to System.Data.SQLite 2.0.4 and pins native SourceGear.sqlite3 3.53.4. v1.0.0-rc.3 adds an isolated SQLite.Core 1.0.119 generator and a fail-closed 1.x-to-v2 offline data-preservation test. Neither opens real databases or authorizes deployment. v1.0.0 release candidate governance produces an **unsigned, source-only checksum/evidence bundle** for exact PR SHA, a direct-NuGet inventory and a formal NO-GO blocker matrix. It is **not a signed executable, complete SBOM, published release, or production authorization**. User-approved production deployment remains blocked by historical privacy, SDK/device, key custody, backup, pilot, identity and operator approvals.
+v1.0.0-rc.1 removes unused Twilio and SQLite EF6 meta-package dependencies and adds a transitive NuGet security audit gate; v1.0.0-rc.2 switches to System.Data.SQLite 2.0.4 and pins native SourceGear.sqlite3 3.53.4. v1.0.0-rc.3 adds an isolated SQLite.Core 1.0.119 generator and a fail-closed 1.x-to-v2 offline data-preservation test. v1.0.0-rc.4 rejects unknown legacy columns, triggers, orphaned references and unexpected schema objects BEFORE backup/DDL, even when an explicit upgrade flag is supplied. Neither uses real databases or authorizes deployment. v1.0.0 release candidate governance produces an **unsigned, source-only checksum/evidence bundle** for exact PR SHA, a direct-NuGet inventory and a formal NO-GO blocker matrix. It is **not a signed executable, complete SBOM, published release, or production authorization**. User-approved production deployment remains blocked by historical privacy, SDK/device, key custody, backup, pilot, identity and operator approvals.
 
 ## Existing critical blockers
 - Legacy Attendance INSERT/schema mismatch is bypassed: experimental scanner events are rejected, not written. New append-only AttendanceEvents tables are not connected to live scanner input until v0.4.0.
