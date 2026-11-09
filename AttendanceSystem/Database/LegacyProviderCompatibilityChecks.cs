@@ -96,8 +96,17 @@ internal static class LegacyProviderCompatibilityChecks
             using (var db = DatabaseSetup.Open(path))
                 Check(Snapshot(db) == original, "rejected upgrade preserved every legacy field");
 
-            // *Explicit* opt-in is safe only for these verified generated paths.
-            DatabaseSetup.InitializeDatabaseAtPath(path, allowExistingUpgrade: true);
+            // Public boolean cannot authorize any legacy upgrade, even when
+            // a caller sets it true. Only fixture-scoped internal API proceeds.
+            var bypassDenied = false;
+            try { DatabaseSetup.InitializeDatabaseAtPath(path, allowExistingUpgrade: true); }
+            catch (InvalidOperationException) { bypassDenied = true; }
+            Check(bypassDenied, "public upgrade boolean must be denied");
+            Check(Directory.GetFiles(directory,
+                      name + ".pre-migration-*.bak").Length == 0,
+                  "public bypass created no backup");
+
+            DatabaseSetup.InitializeSyntheticFixtureAtPath(path);
             using (var db = DatabaseSetup.Open(path))
             {
                 Check(DatabaseSetup.ReadVersion(db) == DatabaseSetup.CurrentSchemaVersion,
@@ -222,7 +231,7 @@ internal static class LegacyProviderCompatibilityChecks
 
         // Explicit authorization must NOT bypass structural safety.
         var failedClosed = false;
-        try { DatabaseSetup.InitializeDatabaseAtPath(clonePath, allowExistingUpgrade: true); }
+        try { DatabaseSetup.InitializeSyntheticFixtureAtPath(clonePath); }
         catch (InvalidOperationException error)
         {
             failedClosed = true;
