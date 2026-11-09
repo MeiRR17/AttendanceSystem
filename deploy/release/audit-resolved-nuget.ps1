@@ -11,29 +11,30 @@ $folder = [IO.Path]::GetFullPath($OutputDirectory)
 if (-not (Test-Path -LiteralPath $folder)) {
   New-Item -ItemType Directory -Path $folder | Out-Null
 }
-# dotnet package list reads the *resolved* post-restore graph, including
-# transitive packages. No feed credentials or project secrets are persisted.
-$jsonLines = @(& dotnet list $projectPath package --include-transitive --format json --no-restore)
-if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect resolved NuGet dependency graph.' }
-$raw = $jsonLines -join [Environment]::NewLine
-try { $data = $raw | ConvertFrom-Json }
-catch { throw 'NuGet JSON graph could not be parsed.' }
-if (-not $data.PSObject.Properties['projects']) {
-  throw 'No project data returned by NuGet.'
+# Inspect the canonical post-restore NuGet assets rather than CLI output.
+# libraries contains every actually resolved direct and transitive package.
+$assetsPath = Join-Path (Join-Path (Split-Path -Parent $projectPath) 'obj') 'project.assets.json'
+if (-not (Test-Path -LiteralPath $assetsPath -PathType Leaf)) {
+  throw 'NuGet project.assets.json not found; run dotnet restore first.'
+}
+try { $assets = Get-Content -LiteralPath $assetsPath -Raw | ConvertFrom-Json }
+catch { throw 'Restored NuGet assets JSON could not be parsed.' }
+if (-not $assets.PSObject.Properties['libraries']) {
+  throw 'NuGet assets missing resolved libraries.'
 }
 $packages = New-Object System.Collections.Generic.List[object]
-foreach ($project in @($data.projects)) {
-  if (-not $project.PSObject.Properties['frameworks']) { continue }
-  foreach ($framework in @($project.frameworks)) {
-    foreach ($field in @('topLevelPackages','transitivePackages')) {
-      if (-not $framework.PSObject.Properties[$field]) { continue }
-      foreach ($package in @($framework.$field)) {
-        if ($null -ne $package -and $package.PSObject.Properties['id']) {
-          $packages.Add($package)
-        }
-      }
-    }
+foreach ($library in $assets.libraries.PSObject.Properties) {
+  if ($null -eq $library.Value -or
+      -not $library.Value.PSObject.Properties['type'] -or
+      $library.Value.type -ne 'package') { continue }
+  $separator = $library.Name.LastIndexOf('/')
+  if ($separator -le 0 -or $separator -ge $library.Name.Length - 1) {
+    throw 'Invalid package ID/version in NuGet assets.'
   }
+  $packages.Add([pscustomobject]@{
+    id = $library.Name.Substring(0,$separator)
+    resolvedVersion = $library.Name.Substring($separator + 1)
+  })
 }
 if ($packages.Count -lt 6) {
   throw 'Unexpectedly empty or incomplete resolved dependency graph.'

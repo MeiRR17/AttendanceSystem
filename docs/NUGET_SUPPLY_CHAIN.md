@@ -23,7 +23,7 @@ The project explicitly sets:
 
 If any currently known moderate/high/critical advisory is reported by the configured NuGet audit source, or audit metadata cannot be retrieved, the restore MUST fail instead of quietly producing a green build. Low-severity advisories are not included in this policy and remain a separate review concern.
 
-An explicit PowerShell gate \`deploy/release/audit-resolved-nuget.ps1\` reads the post-restore resolved transitive package graph via \`dotnet list ... package --include-transitive --format json --no-restore\`. It rejects the unexpected return of:
+An explicit PowerShell gate \`deploy/release/audit-resolved-nuget.ps1\` reads the resolved direct and transitive dependencies from the canonical post-restore `obj/project.assets.json` library map. It rejects the unexpected return of:
 - \`System.Data.SQLite\` wrapper
 - \`System.Data.SQLite.EF6\`, \`EntityFramework\`
 - \`System.Data.SqlClient\`, \`System.Drawing.Common\`
