@@ -52,6 +52,7 @@ internal static class LegacyProviderCompatibilityChecks
         Check(entries.Length == 2, "expected exactly two separate old-schema fixtures");
         var receipts = new List<MigrationRehearsalReceipt>();
         var checkpoints = new List<SyntheticSignedAuditCheckpoint>();
+        var witnessTestPins = new Dictionary<int, byte[]>();
         foreach (var entry in entries)
         {
             var name = entry.GetProperty("file").GetString();
@@ -107,6 +108,7 @@ internal static class LegacyProviderCompatibilityChecks
                 SyntheticAuditCheckpointSmokeChecks.Run(
                     path, audit, signedHead, checkpointSigner.PinnedTestPublicKey);
                 checkpoints.Add(signedHead);
+                witnessTestPins.Add(schema, checkpointSigner.PinnedTestPublicKey);
             }
 
             var replayDenied = false;
@@ -256,6 +258,13 @@ internal static class LegacyProviderCompatibilityChecks
             SyntheticMigrationEvidence.Write(receipts, evidenceDirectory);
             SyntheticAuditCheckpointEvidence.Write(
                 evidenceDirectory, checkpoints);
+            var witnessPinsDirectory = Environment.GetEnvironmentVariable(
+                "ATTENDANCE_SYNTHETIC_WITNESS_PINS_DIR");
+            if (string.IsNullOrWhiteSpace(witnessPinsDirectory))
+                throw new InvalidOperationException(
+                    "Separate synthetic witness public key pins are required.");
+            SyntheticAuditCheckpointEvidence.WriteWitnessTestPins(
+                witnessPinsDirectory, witnessTestPins);
             Console.WriteLine("SYNTHETIC_RESTORE_EVIDENCE=NO-GO");
             Console.WriteLine("SYNTHETIC_DETACHED_AUDIT=PASS");
         }
