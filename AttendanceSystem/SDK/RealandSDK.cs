@@ -1,13 +1,10 @@
 using System;
 using System.Xml;
 using System.IO;
-using System.Threading.Tasks;
 using SuperSocket.WebSocket;
 using SuperSocket.SocketBase;
 using System.Collections.Generic;
 using SuperSocket.SocketBase.Config;
-using System.Data.SQLite;
-using AttendanceSystem.Services; // Ensure this line is included
 
 public class RealandSDK
 {
@@ -89,69 +86,14 @@ public class RealandSDK
 
     private void HandleTimeLog(XmlElement root)
     {
-        var studentID = root.SelectSingleNode("StudentID")?.InnerText;
-        var studentName = root.SelectSingleNode("Name")?.InnerText;
-        var studentPhoneNumber = root.SelectSingleNode("PhoneNumber")?.InnerText;
-        var timestamp = DateTime.Now;
-
-        if (!string.IsNullOrEmpty(studentID) && !string.IsNullOrEmpty(studentName) && !string.IsNullOrEmpty(studentPhoneNumber))
-        {
-            _ = StoreAttendanceWithErrorLoggingAsync(studentID, studentName, studentPhoneNumber, timestamp);
-        }
-        else
-        {
-            Console.WriteLine("Error: StudentID, Name, or PhoneNumber is missing in the TimeLog message.");
-        }
+        // Unauthenticated and no vendor-verified stable event key.
+        // Never persist these messages until a trusted v0.4.0 adapter is installed.
+        Console.WriteLine("Legacy scanner event rejected: trusted ingest is not enabled.");
     }
 
     private void HandleAdminLog(XmlElement root)
     {
-        // Handle admin log messages
-        Console.WriteLine("AdminLog received.");
-    }
-
-    private async Task StoreAttendanceWithErrorLoggingAsync(string studentID, string name, string phoneNumber, DateTime timestamp)
-    {
-        try
-        {
-            await StoreAttendanceDataAsync(studentID, name, phoneNumber, timestamp);
-        }
-        catch (Exception ex)
-        {
-            // Legacy pathway has no durable retry or ACK. Do not report success on error.
-            Console.Error.WriteLine("Legacy attendance write failed: " + ex.GetType().Name);
-        }
-    }
-
-    private async Task StoreAttendanceDataAsync(string studentID, string name, string phoneNumber, DateTime timestamp)
-    {
-        await HolidayChecker.InitializeHolidays(); // Correct namespace reference
-
-        if (HolidayChecker.IsWeekendOrHoliday(timestamp)) // Correct namespace reference
-        {
-            Console.WriteLine("Today is a weekend or holiday. No attendance recorded.");
-            return;
-        }
-
-        string status = timestamp.TimeOfDay <= new TimeSpan(8, 0, 0) ? "On Time" : "Late";
-
-        using (SQLiteConnection conn = new SQLiteConnection("Data Source=attendance.db;Version=3;"))
-        {
-            conn.Open();
-            string sql = "INSERT OR REPLACE INTO Attendance (StudentID, Name, PhoneNumber, Date, Time, Status) " +
-                         "VALUES (@StudentID, @Name, @PhoneNumber, @Date, @Time, @Status)";
-            using (SQLiteCommand command = new SQLiteCommand(sql, conn))
-            {
-                command.Parameters.AddWithValue("@StudentID", studentID);
-                command.Parameters.AddWithValue("@Name", name);
-                command.Parameters.AddWithValue("@PhoneNumber", phoneNumber);
-                command.Parameters.AddWithValue("@Date", timestamp.Date);
-                command.Parameters.AddWithValue("@Time", timestamp.TimeOfDay);
-                command.Parameters.AddWithValue("@Status", status);
-                command.ExecuteNonQuery();
-            }
-        }
-        Console.WriteLine("Legacy attendance write completed.");
+        Console.WriteLine("Legacy administrative message ignored.");
     }
 
     public void SyncUserData(List<UserData> users)
