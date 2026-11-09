@@ -1,4 +1,5 @@
 using AttendanceSystem.Runtime;
+using AttendanceSystem.Database;
 using System.Globalization;
 
 namespace AttendanceSystem;
@@ -15,9 +16,15 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length == 1 && args[0] == "--self-test-db")
+            {
+                DatabaseSmokeChecks.Run();
+                return 0;
+            }
+
             if (args.Length > 0 && (args.Length != 1 || args[0] != "--check-config"))
             {
-                Console.Error.WriteLine("Usage: AttendanceSystem [--check-config|--self-test]");
+                Console.Error.WriteLine("Usage: AttendanceSystem [--check-config|--self-test|--self-test-db]");
                 return 2;
             }
 
@@ -39,7 +46,8 @@ internal static class Program
 
             // Explicitly opted-in legacy bridge. For loopback-only experiments.
             // Never attach real devices, production data or public-facing ports yet.
-            DatabaseSetup.InitializeDatabase();
+            // Scanner ingress remains disabled at the persistence boundary until v0.4.0.
+            // Never auto-migrate a student's database just because a process started.
             var gateway = new RealandSDK();
             using var shutdownSignal = new ManualResetEventSlim(false);
             ConsoleCancelEventHandler stopOnCtrlC = (_, eventArgs) =>

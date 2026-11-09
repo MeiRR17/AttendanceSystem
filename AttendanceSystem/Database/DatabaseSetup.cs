@@ -1,47 +1,206 @@
-﻿using System;
 using System.Data.SQLite;
+using System.Globalization;
 
+namespace AttendanceSystem.Database;
+
+/// <summary>
+/// Additive SQLite migrations. Historical Students/Attendance/Holidays tables
+/// are preserved byte-for-byte by SQL (no DROP, ALTER, or data rewrite).
+/// Existing databases require an explicit upgrade flag and SQLite backup.
+/// </summary>
 public static class DatabaseSetup
 {
+    public const int CurrentSchemaVersion = 2;
+
     public static void InitializeDatabase()
     {
-        using (SQLiteConnection conn = new SQLiteConnection("Data Source=attendance.db;Version=3;"))
+        var path = Environment.GetEnvironmentVariable("ATTENDANCE_DB_PATH");
+        InitializeDatabaseAtPath(string.IsNullOrWhiteSpace(path) ? "attendance.db" : path);
+    }
+
+    public static void InitializeDatabaseAtPath(string path, bool allowExistingUpgrade = false)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            throw new ArgumentException("Database path is required.", nameof(path));
+
+        var fullPath = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(fullPath);
+        if (directory is null || !System.IO.Directory.Exists(directory))
+            throw new DirectoryNotFoundException("Database parent directory does not exist.");
+
+        var existed = File.Exists(fullPath);
+        using var connection = Open(fullPath, failIfMissing: false);
+        var version = ReadVersion(connection);
+        if (version > CurrentSchemaVersion)
+            throw new InvalidOperationException("Database schema is newer than this application.");
+
+        if (version == CurrentSchemaVersion)
         {
-            conn.Open();
-
-            string createStudentsTable = @"
-            CREATE TABLE IF NOT EXISTS Students (
-                StudentID TEXT PRIMARY KEY,
-                Name TEXT,
-                PhoneNumber TEXT
-            );";
-
-            string createAttendanceTable = @"
-            CREATE TABLE IF NOT EXISTS Attendance (
-                StudentID TEXT,
-                Date TEXT,
-                Time TEXT,
-                FirstLessonStatus TEXT,
-                SecondLessonStatus TEXT
-            );";
-
-            string createHolidaysTable = @"
-            CREATE TABLE IF NOT EXISTS Holidays (
-                Date TEXT PRIMARY KEY
-            );";
-
-            using (SQLiteCommand command = new SQLiteCommand(createStudentsTable, conn))
-            {
-                command.ExecuteNonQuery();
-            }
-            using (SQLiteCommand command = new SQLiteCommand(createAttendanceTable, conn))
-            {
-                command.ExecuteNonQuery();
-            }
-            using (SQLiteCommand command = new SQLiteCommand(createHolidaysTable, conn))
-            {
-                command.ExecuteNonQuery();
-            }
+            AssertRequiredTables(connection);
+            return;
         }
+
+        if (existed && !allowExistingUpgrade)
+            throw new InvalidOperationException(
+                "Existing database migration requires a verified backup and explicit approval. " +
+                "Use an authorized upgrade process; never migrate a real student database in CI.");
+
+        if (existed)
+            CreateSqliteBackup(connection, fullPath);
+
+        using var transaction = connection.BeginTransaction();
+        Execute(connection, transaction, """
+            CREATE TABLE IF NOT EXISTS SchemaMigrations (
+                Version INTEGER PRIMARY KEY,
+                AppliedAtUtc TEXT NOT NULL
+            );
+            """);
+
+        if (version < 1)
+        {
+            Execute(connection, transaction, """
+                CREATE TABLE IF NOT EXISTS Students (
+                    StudentID TEXT PRIMARY KEY,
+                    Name TEXT,
+                    PhoneNumber TEXT
+                );
+                CREATE TABLE IF NOT EXISTS Attendance (
+                    StudentID TEXT,
+                    Date TEXT,
+                    Time TEXT,
+                    FirstLessonStatus TEXT,
+                    SecondLessonStatus TEXT
+                );
+                CREATE TABLE IF NOT EXISTS Holidays (
+                    Date TEXT PRIMARY KEY
+                );
+                """);
+            RecordMigration(connection, transaction, 1);
+        }
+
+        if (version < 2)
+        {
+            // New event model does not overwrite unreliable legacy attendance rows.
+            Execute(connection, transaction, """
+                CREATE TABLE IF NOT EXISTS Devices (
+                    DeviceID TEXT PRIMARY KEY,
+                    Enabled INTEGER NOT NULL DEFAULT 0 CHECK (Enabled IN (0, 1)),
+                    RegisteredAtUtc TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS AttendanceEvents (
+                    EventID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    DeviceID TEXT NOT NULL REFERENCES Devices(DeviceID),
+                    EventKey TEXT NOT NULL,
+                    StudentID TEXT NOT NULL,
+                    OccurredAtUtc TEXT NOT NULL,
+                    ReceivedAtUtc TEXT NOT NULL,
+                    UNIQUE (DeviceID, EventKey)
+                );
+                CREATE INDEX IF NOT EXISTS IX_AttendanceEvents_Student_OccurredAt
+                    ON AttendanceEvents(StudentID, OccurredAtUtc);
+                CREATE TABLE IF NOT EXISTS AttendanceDecisions (
+                    EventID INTEGER PRIMARY KEY REFERENCES AttendanceEvents(EventID),
+                    RuleVersion TEXT NOT NULL,
+                    Status TEXT NOT NULL,
+                    EvaluatedAtUtc TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS Schedules (
+                    ScheduleID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Name TEXT NOT NULL,
+                    StartsAtLocal TEXT NOT NULL,
+                    GraceMinutes INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE IF NOT EXISTS AuditEvents (
+                    AuditID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Action TEXT NOT NULL,
+                    EntityKey TEXT NOT NULL,
+                    ActorKey TEXT NOT NULL,
+                    CreatedAtUtc TEXT NOT NULL
+                );
+                """);
+            RecordMigration(connection, transaction, 2);
+        }
+
+        transaction.Commit();
+        AssertRequiredTables(connection);
+    }
+
+    internal static SQLiteConnection Open(string path, bool failIfMissing = true)
+    {
+        var builder = new SQLiteConnectionStringBuilder
+        {
+            DataSource = Path.GetFullPath(path),
+            Version = 3,
+            FailIfMissing = failIfMissing
+        };
+        var connection = new SQLiteConnection(builder.ToString());
+        connection.Open();
+        using var pragma = connection.CreateCommand();
+        pragma.CommandText = "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;";
+        pragma.ExecuteNonQuery();
+        return connection;
+    }
+
+    public static int ReadVersion(SQLiteConnection connection)
+    {
+        using var table = connection.CreateCommand();
+        table.CommandText = """
+            SELECT COUNT(*) FROM sqlite_master
+            WHERE type='table' AND name='SchemaMigrations';
+            """;
+        if (Convert.ToInt32(table.ExecuteScalar(), CultureInfo.InvariantCulture) == 0)
+            return 0;
+
+        using var version = connection.CreateCommand();
+        version.CommandText = "SELECT COALESCE(MAX(Version), 0) FROM SchemaMigrations;";
+        return Convert.ToInt32(version.ExecuteScalar(), CultureInfo.InvariantCulture);
+    }
+
+    private static void AssertRequiredTables(SQLiteConnection connection)
+    {
+        foreach (var tableName in new[]
+                 { "Students", "Attendance", "Holidays", "Devices", "AttendanceEvents",
+                   "AttendanceDecisions", "Schedules", "AuditEvents", "SchemaMigrations" })
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=@name;";
+            command.Parameters.AddWithValue("@name", tableName);
+            if (Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+                throw new InvalidOperationException("Missing schema table: " + tableName);
+        }
+    }
+
+    private static void RecordMigration(SQLiteConnection connection, SQLiteTransaction tx, int version)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = tx;
+        command.CommandText =
+            "INSERT INTO SchemaMigrations (Version, AppliedAtUtc) VALUES (@version, @applied);";
+        command.Parameters.AddWithValue("@version", version);
+        command.Parameters.AddWithValue("@applied", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        command.ExecuteNonQuery();
+    }
+
+    private static void Execute(SQLiteConnection connection, SQLiteTransaction tx, string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = tx;
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
+    }
+
+    private static void CreateSqliteBackup(SQLiteConnection source, string path)
+    {
+        // SQLite online backup API, rather than File.Copy on a potentially active WAL DB.
+        // Backup path is local/private; operators must secure access and retention.
+        var suffix = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmssfffffff", CultureInfo.InvariantCulture);
+        var backup = path + ".pre-migration-" + suffix + ".bak";
+        using var destination = Open(backup, failIfMissing: false);
+        source.BackupDatabase(destination, "main", "main", -1, null, 0);
+        using var verification = destination.CreateCommand();
+        verification.CommandText = "PRAGMA integrity_check;";
+        if (!string.Equals(Convert.ToString(verification.ExecuteScalar(), CultureInfo.InvariantCulture),
+                           "ok", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Backup integrity check failed.");
     }
 }

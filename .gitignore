@@ -30,3 +30,13 @@ secrets.json
 appsettings.Development.local.json
 *.key
 *.pfx
+
+# All attendance databases and snapshots (never commit private records)
+**/*.db
+**/*.db-*
+**/*.db.pre-migration-*.bak
+**/*.sqlite
+**/*.sqlite3
+**/*.sqlite-wal
+**/*.sqlite-shm
+**/*.bak
