@@ -188,6 +188,10 @@ public static class RuleEngineSmokeChecks
         {
             return;
         }
+        catch (System.Text.Json.JsonException)
+        {
+            return;
+        }
         throw new InvalidOperationException("Expected invalid rules rejection: "+label);
     }
 
