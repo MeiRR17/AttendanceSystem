@@ -9,7 +9,7 @@
 - Console runtime has safe default (no network listener, no DB modification, no WhatsApp). The legacy listener requires an explicit acknowledgement.
 - SuperSocket listener is constrained to 127.0.0.1, not remotely accessible without subsequent redesign.
 - On socket startup failure, fail closed and exit. Ctrl+C stops the legacy server; input parser bounds message length and refuses DTD/XXE.
-- Manual workflow_dispatch GitHub Actions build on Windows with offline configuration smoke cases. Intentionally no automatic CI run, conserving quota.
+- PR-scoped Windows .NET 10 build and offline configuration smoke checks; also supports manual workflow_dispatch after the workflow exists on the default branch. Jobs are scoped to relevant source/config changes and have a 15-minute timeout.
 
 ## Commands
 Use a **clean clone** with the .NET 10 SDK on a Windows x64 host; do not connect a scanner or real student DB:
@@ -21,7 +21,7 @@ Use a **clean clone** with the .NET 10 SDK on a Windows x64 host; do not connect
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release -- --check-config
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release
 
-The last command should exit immediately in safe mode, without opening a network port or creating an attendance database. A manual GitHub Actions workflow is available under Actions > Manual .NET 10 build and offline smoke checks (workflow_dispatch); it is not automatically started.
+The last command should exit immediately in safe mode, without opening a network port or creating an attendance database. GitHub Actions runs Build and offline smoke checks on pull requests changing relevant source files, subject to available Actions quota. A workflow_dispatch trigger is also defined; GitHub generally requires the workflow file on the default branch before manual dispatch can be used.
 
 ## Dangerous legacy gateway — offline testing only
 The following values deliberately permit running the 2018 SDK on loopback, not a trusted production service:

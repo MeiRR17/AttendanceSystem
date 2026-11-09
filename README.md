@@ -15,7 +15,7 @@ Use a clean Windows x64 machine with the .NET 10 SDK (see global.json). Start wi
 
 The last command exits in safe mode: no listener, DB creation, scanner access, or Twilio message. To explore the unauthenticated loopback-only legacy gateway in an isolated local environment, follow docs/SDK_COMPATIBILITY.md. Never enable it with real devices/students.
 
-A manual-only GitHub Actions workflow provides a clean Windows .NET 10 build and smoke checks. It consumes CI minutes only when explicitly dispatched. Nothing here claims that CI has run.
+A scoped GitHub Actions pull-request workflow provides a clean Windows .NET 10 build and safe smoke checks when available; it can consume CI minutes. A separate manual dispatch trigger is defined for later use when the workflow resides on the default branch. No CI success is claimed.
 
 ## Project documentation
 - [Full Hebrew production roadmap](docs/PRODUCTION_ROADMAP.he.md)

@@ -1,6 +1,14 @@
-name: Manual .NET 10 build and offline smoke checks
+name: .NET 10 build and offline smoke checks
 
 on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'AttendanceSystem/**'
+      - 'AttendanceSystem.sln'
+      - 'global.json'
+      - '.github/workflows/manual-dotnet10-build.yml'
   workflow_dispatch:
 
 permissions:
