@@ -17,7 +17,9 @@ internal static class SyntheticMigrationRehearsal
     internal static MigrationRehearsalReceipt Run(
         string sourcePath, string expectedOldProviderFileSha256,
         SyntheticMigrationReviewEnvelope signedSyntheticReview,
-        SyntheticReviewerTrustPolicy trustedTestReviewers,
+        SyntheticRootSignedPolicy signedRootPolicy,
+        byte[] pinnedTestRootPublicKey,
+        SyntheticTrustEpochLedger rootEpochLedger,
         SyntheticDurableReviewNonceLedger usedNonceLedger)
     {
         SyntheticMigrationScope.Demand(sourcePath);
@@ -75,9 +77,16 @@ internal static class SyntheticMigrationRehearsal
                 // Two independent ECDSA P-256 fixture reviewers must sign the
                 // exact source hash, schema, nonce, purpose and expiry BEFORE
                 // any clone, backup, or database migration is started.
+                var now = DateTimeOffset.UtcNow;
+                // The reviewer registry is sourced ONLY from an independently
+                // root-signed fixture policy. Caller-provided reviewer keys
+                // alone are not accepted by this migration entry point.
+                var verifiedReviewers = SyntheticOfflineRootTrust.VerifyAndPin(
+                    signedRootPolicy, pinnedTestRootPublicKey,
+                    rootEpochLedger, now);
                 SyntheticMigrationApprovalGate.VerifyAndConsume(
                     signedSyntheticReview, sourceHash, oldVersion,
-                    trustedTestReviewers, usedNonceLedger, DateTimeOffset.UtcNow);
+                    verifiedReviewers, usedNonceLedger, now);
 
                 using var output = DatabaseSetup.Open(clone, failIfMissing: false);
                 db.BackupDatabase(output, "main", "main", -1, null, 0);
@@ -152,6 +161,7 @@ internal static class SyntheticMigrationRehearsal
                 RollbackToOriginalSchemaVerified: true,
                 SyntheticDualReviewVerified: true,
                 DurableReviewLedgerUsed: true,
+                OfflineRootTrustVerified: true,
                 RealDataUsed: false,
                 ProductionMigrationAuthorized: false,
                 Decision: "NO-GO");
@@ -236,5 +246,6 @@ internal sealed record MigrationRehearsalReceipt(
     int StudentCount, int AttendanceCount, int HolidayCount,
     bool CloneOnly, bool OriginalUnchanged, bool PreMigrationBackupVerified,
     bool RollbackToOriginalSchemaVerified, bool SyntheticDualReviewVerified,
-    bool DurableReviewLedgerUsed, bool RealDataUsed,
+    bool DurableReviewLedgerUsed, bool OfflineRootTrustVerified,
+    bool RealDataUsed,
     bool ProductionMigrationAuthorized, string Decision);

@@ -21,6 +21,7 @@ on:
       - 'codex/v1.0.0-rc5-explicit-synthetic-migration-gate-20261109'
       - 'codex/v1.0.0-rc6-synthetic-migration-rehearsal-20261109'
       - 'codex/v1.0.0-rc7-dual-signed-synthetic-approvals-20261109'
+      - 'codex/v1.0.0-rc8-reviewer-trust-durable-replay-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
@@ -31,6 +32,7 @@ on:
       - 'docs/SQLITE_MIGRATION_REHEARSAL.md'
       - 'docs/SQLITE_SYNTHETIC_SIGNED_REVIEWS.md'
       - 'docs/SQLITE_REVIEWER_TRUST_AND_REPLAY.md'
+      - 'docs/SQLITE_OFFLINE_ROOT_TRUST.md'
       - 'global.json'
       - '.github/workflows/manual-dotnet10-build.yml'
       - 'deploy/staging/**'
@@ -75,7 +77,7 @@ jobs:
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test
       - name: SQLite migration, public bypass denial, test fixture path and dedup checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-db
-      - name: Revocable P256 test reviewer trust and durable SQLite replay gate plus v1 to v2 recovery
+      - name: Offline root-signed synthetic trust, epoch rollback denial and SQLite recovery
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -107,7 +109,8 @@ jobs:
                 @($report.result).Count -ne 2 -or
                 @($report.result | Where-Object {
                   $_.syntheticDualReviewVerified -ne $true -or
-                  $_.durableReviewLedgerUsed -ne $true
+                  $_.durableReviewLedgerUsed -ne $true -or
+                  $_.offlineRootTrustVerified -ne $true
                 }).Count -ne 0) {
               throw 'Migration evidence does not have a safe NO-GO contract.'
             }
@@ -133,7 +136,7 @@ jobs:
       - name: Upload synthetic-only SQLite recovery evidence (NOT production approval)
         uses: actions/upload-artifact@v4
         with:
-          name: attendance-rc8-reviewer-trust-no-go-${{ github.run_id }}
+          name: attendance-rc9-offline-root-no-go-${{ github.run_id }}
           path: ${{ runner.temp }}/attendance-rc6-migration-evidence/
           if-no-files-found: error
           retention-days: 7
