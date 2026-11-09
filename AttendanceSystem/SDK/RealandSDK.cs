@@ -1,5 +1,7 @@
-﻿using System;
+using System;
 using System.Xml;
+using System.IO;
+using System.Threading.Tasks;
 using SuperSocket.WebSocket;
 using SuperSocket.SocketBase;
 using System.Collections.Generic;
@@ -9,7 +11,7 @@ using AttendanceSystem.Services; // Ensure this line is included
 
 public class RealandSDK
 {
-    private WebSocketServer wsServer;
+    private WebSocketServer? wsServer;
 
     public void InitializeWebSocketServer(string port)
     {
@@ -17,32 +19,71 @@ public class RealandSDK
 
         var serverConfig = new ServerConfig
         {
+            Ip = "127.0.0.1", // Unauthenticated legacy gateway: loopback only.
             Port = Convert.ToInt32(port),
-            MaxConnectionNumber = 50,
+            MaxConnectionNumber = 10,
+            MaxRequestLength = 65536,
             SyncSend = true
         };
 
-        wsServer.Setup(serverConfig);
-        wsServer.Start();
+        if (!wsServer.Setup(serverConfig))
+            throw new InvalidOperationException("Legacy WebSocket setup failed.");
         wsServer.NewMessageReceived += OnMessageReceived;
+        if (!wsServer.Start())
+        {
+            wsServer.NewMessageReceived -= OnMessageReceived;
+            throw new InvalidOperationException("Legacy WebSocket start failed.");
+        }
+        Console.WriteLine("Legacy loopback WebSocket listening on port " + port);
+    }
 
-        Console.WriteLine("WebSocket server initialized and started on port " + port);
+    public void StopServer()
+    {
+        if (wsServer is null)
+            return;
+        wsServer.NewMessageReceived -= OnMessageReceived;
+        wsServer.Stop();
+        wsServer = null;
     }
 
     private void OnMessageReceived(WebSocketSession session, string message)
     {
-        var xmlDoc = new XmlDocument();
-        xmlDoc.LoadXml(message);
-        var root = xmlDoc.DocumentElement;
-
-        switch (root.Name)
+        if (string.IsNullOrEmpty(message) || message.Length > 65536)
         {
-            case "TimeLog":
-                HandleTimeLog(root);
-                break;
-            case "AdminLog":
-                HandleAdminLog(root);
-                break;
+            Console.Error.WriteLine("Rejected scanner message: invalid size.");
+            return;
+        }
+        try
+        {
+            var settings = new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Prohibit,
+                XmlResolver = null,
+                MaxCharactersInDocument = 65536
+            };
+            using var input = new StringReader(message);
+            using var reader = XmlReader.Create(input, settings);
+            var xmlDoc = new XmlDocument { XmlResolver = null };
+            xmlDoc.Load(reader);
+            var root = xmlDoc.DocumentElement;
+            if (root is null)
+                return;
+            switch (root.Name)
+            {
+                case "TimeLog":
+                    HandleTimeLog(root);
+                    break;
+                case "AdminLog":
+                    HandleAdminLog(root);
+                    break;
+                default:
+                    Console.Error.WriteLine("Rejected scanner message: unknown type.");
+                    break;
+            }
+        }
+        catch (XmlException)
+        {
+            Console.Error.WriteLine("Rejected malformed scanner XML.");
         }
     }
 
@@ -55,8 +96,7 @@ public class RealandSDK
 
         if (!string.IsNullOrEmpty(studentID) && !string.IsNullOrEmpty(studentName) && !string.IsNullOrEmpty(studentPhoneNumber))
         {
-            Console.WriteLine($"Handling TimeLog for StudentID: {studentID} at {timestamp}");
-            StoreAttendanceData(studentID, studentName, studentPhoneNumber, timestamp);
+            _ = StoreAttendanceWithErrorLoggingAsync(studentID, studentName, studentPhoneNumber, timestamp);
         }
         else
         {
@@ -70,7 +110,20 @@ public class RealandSDK
         Console.WriteLine("AdminLog received.");
     }
 
-    private async void StoreAttendanceData(string studentID, string name, string phoneNumber, DateTime timestamp)
+    private async Task StoreAttendanceWithErrorLoggingAsync(string studentID, string name, string phoneNumber, DateTime timestamp)
+    {
+        try
+        {
+            await StoreAttendanceDataAsync(studentID, name, phoneNumber, timestamp);
+        }
+        catch (Exception ex)
+        {
+            // Legacy pathway has no durable retry or ACK. Do not report success on error.
+            Console.Error.WriteLine("Legacy attendance write failed: " + ex.GetType().Name);
+        }
+    }
+
+    private async Task StoreAttendanceDataAsync(string studentID, string name, string phoneNumber, DateTime timestamp)
     {
         await HolidayChecker.InitializeHolidays(); // Correct namespace reference
 
@@ -98,7 +151,7 @@ public class RealandSDK
                 command.ExecuteNonQuery();
             }
         }
-        Console.WriteLine("Attendance data stored successfully for StudentID: " + studentID);
+        Console.WriteLine("Legacy attendance write completed.");
     }
 
     public void SyncUserData(List<UserData> users)
@@ -106,7 +159,7 @@ public class RealandSDK
         foreach (var user in users)
         {
             string userXml = GenerateUserXml(user);
-            wsServer.GetAllSessions().FirstOrDefault()?.Send(userXml);
+            wsServer?.GetAllSessions().FirstOrDefault()?.Send(userXml);
         }
     }
 
@@ -134,7 +187,7 @@ public class RealandSDK
 
 public class UserData
 {
-    public string ID { get; set; }
-    public string Name { get; set; }
+    public string ID { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
     public bool Enabled { get; set; }
 }

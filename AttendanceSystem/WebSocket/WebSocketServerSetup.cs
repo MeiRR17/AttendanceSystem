@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using SuperSocket.WebSocket;
 using SuperSocket.SocketBase;
 using SuperSocket.SocketBase.Config;
 using System.Xml;
+using System.IO;
 using System.Data.SQLite;
 
 public class WebSocketServerSetup
@@ -52,17 +53,29 @@ public class WebSocketServerSetup
     private void OnMessageReceived(WebSocketSession session, string message)
     {
         // Print received message to the console
-        Console.WriteLine("Raw message received: " + message);
+        if (string.IsNullOrEmpty(message) || message.Length > 65536)
+        {
+            Console.Error.WriteLine("Rejected scanner message: invalid size.");
+            return;
+        }
 
         try
         {
-            var xmlDoc = new XmlDocument();
-            xmlDoc.LoadXml(message);
+            var settings = new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Prohibit,
+                XmlResolver = null,
+                MaxCharactersInDocument = 65536
+            };
+            using var input = new StringReader(message);
+            using var reader = XmlReader.Create(input, settings);
+            var xmlDoc = new XmlDocument { XmlResolver = null };
+            xmlDoc.Load(reader);
             var root = xmlDoc.DocumentElement;
 
             if (root != null)
             {
-                Console.WriteLine("Parsed XML Document: " + root.OuterXml);
+                // Never log entire XML messages.
                 Console.WriteLine("Message type: " + root.Name);
                 if (root.Name == "TimeLog")
                 {
@@ -97,7 +110,7 @@ public class WebSocketServerSetup
 
         if (!string.IsNullOrEmpty(studentID) && !string.IsNullOrEmpty(studentName) && !string.IsNullOrEmpty(studentPhoneNumber))
         {
-            Console.WriteLine($"Handling TimeLog for StudentID: {studentID}, Name: {studentName}, PhoneNumber: {studentPhoneNumber} at {timestamp}");
+            Console.WriteLine("Handling legacy TimeLog event.");
             StoreAttendanceData(studentID, studentName, studentPhoneNumber, timestamp);
         }
         else
@@ -131,6 +144,6 @@ public class WebSocketServerSetup
                 command.ExecuteNonQuery();
             }
         }
-        Console.WriteLine("Attendance data stored successfully for StudentID: " + studentID);
+        Console.WriteLine("Legacy attendance write completed.");
     }
 }
