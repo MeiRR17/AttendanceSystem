@@ -50,6 +50,7 @@ internal static class LegacyProviderCompatibilityChecks
 
         var entries = root.GetProperty("files").EnumerateArray().ToArray();
         Check(entries.Length == 2, "expected exactly two separate old-schema fixtures");
+        var receipts = new List<MigrationRehearsalReceipt>();
         foreach (var entry in entries)
         {
             var name = entry.GetProperty("file").GetString();
@@ -62,6 +63,40 @@ internal static class LegacyProviderCompatibilityChecks
             var sha = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
             Check(sha == entry.GetProperty("sha256").GetString(),
                   "legacy file must match 1.x generator receipt BEFORE opening");
+
+            // A recovery rehearsal must use a separate clone; it must never
+            // modify the original 1.x fixture or authorize an actual upgrade.
+            var rejectedReceipt = false;
+            try
+            {
+                SyntheticMigrationRehearsal.Run(path, new string('0', 64));
+            }
+            catch (InvalidOperationException) { rejectedReceipt = true; }
+            Check(rejectedReceipt, "wrong fixture digest rejects before any clone");
+            Check(Directory.GetFiles(directory, "rehearsal-*.db").Length == 0,
+                  "invalid fixture receipt created no clone");
+
+            var recovery = SyntheticMigrationRehearsal.Run(path, sha);
+            receipts.Add(recovery);
+            Check(recovery.Format == "attendance-synthetic-migration-rehearsal-v1" &&
+                  recovery.OriginalSchema == schema &&
+                  recovery.TargetSchema == DatabaseSetup.CurrentSchemaVersion &&
+                  recovery.StudentCount == 4 &&
+                  recovery.AttendanceCount == 3 &&
+                  recovery.HolidayCount == 2 &&
+                  recovery.CloneOnly &&
+                  recovery.OriginalUnchanged &&
+                  recovery.PreMigrationBackupVerified &&
+                  recovery.RollbackToOriginalSchemaVerified &&
+                  !recovery.RealDataUsed &&
+                  !recovery.ProductionMigrationAuthorized &&
+                  recovery.Decision == "NO-GO",
+                  "clone-only migration, backup and rollback are verified but NO-GO");
+            Check(Directory.GetFiles(directory, "rehearsal-*").Length == 0,
+                  "rehearsal cleans up its disposable plaintext artifacts");
+            using (var originalAfterRehearsal = DatabaseSetup.Open(path))
+                Check(DatabaseSetup.ReadVersion(originalAfterRehearsal) == schema,
+                      "source 1.x fixture remains unupgraded after rehearsal");
 
             LegacyRows original;
             using (var db = DatabaseSetup.Open(path))
@@ -163,9 +198,18 @@ internal static class LegacyProviderCompatibilityChecks
             }
         }
 
+        var evidenceDirectory =
+            Environment.GetEnvironmentVariable("ATTENDANCE_MIGRATION_EVIDENCE_DIR");
+        if (!string.IsNullOrWhiteSpace(evidenceDirectory))
+        {
+            SyntheticMigrationEvidence.Write(receipts, evidenceDirectory);
+            Console.WriteLine("SYNTHETIC_RESTORE_EVIDENCE=NO-GO");
+        }
+
         Console.WriteLine("SQLite v1.x -> v2 provider compatibility PASS: 2 real v1.x-generated " +
-                          "synthetic DBs (schema 0/1), 18 historical rows preserved across " +
-                          "read/refused-upgrade/backup/explicit v4 upgrade/replay/reopen; NO real data.");
+                          "synthetic DBs (schema 0/1), 18 historical rows preserved; " +
+                          "clone-only upgrade, verified pre-migration backup, isolated rollback, " +
+                          "wrong-receipt denial and cleanup passed; NO real data, NO-GO.");
     }
 
     private static void VerifyUnsafeSchemaVariants(
