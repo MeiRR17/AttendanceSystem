@@ -7,6 +7,7 @@ on:
       - 'codex/v0.2.0-dotnet10-reproducible-gateway-20261109'
       - 'codex/v0.3.0-safe-sqlite-events-20261109'
       - 'codex/v0.4.0-authenticated-bridge-20261109'
+      - 'codex/v0.5.0-policy-calendar-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'
@@ -40,6 +41,8 @@ jobs:
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-bridge
       - name: Attendance policy, Israel DST, audit and offline Hebcal fixture checks
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-rules
+      - name: Consent-gated offline notification outbox smoke
+        run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --self-test-outbox
       - name: Verify safe startup configuration
         run: dotnet run --project AttendanceSystem/AttendanceSystem.csproj --configuration Release --no-build -- --check-config
       - name: Verify disabled-by-default startup
