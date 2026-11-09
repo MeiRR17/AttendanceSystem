@@ -20,7 +20,8 @@ internal static class SyntheticMigrationRehearsal
         SyntheticRootSignedPolicy signedRootPolicy,
         byte[] pinnedTestRootPublicKey,
         SyntheticTrustEpochLedger rootEpochLedger,
-        SyntheticDurableReviewNonceLedger usedNonceLedger)
+        SyntheticDurableReviewNonceLedger usedNonceLedger,
+        SyntheticMigrationAuditChain auditTrail)
     {
         SyntheticMigrationScope.Demand(sourcePath);
         var sourceName = Path.GetFileName(sourcePath);
@@ -87,6 +88,7 @@ internal static class SyntheticMigrationRehearsal
                 SyntheticMigrationApprovalGate.VerifyAndConsume(
                     signedSyntheticReview, sourceHash, oldVersion,
                     verifiedReviewers, usedNonceLedger, now);
+                auditTrail.Append("synthetic-review-accepted");
 
                 using var output = DatabaseSetup.Open(clone, failIfMissing: false);
                 db.BackupDatabase(output, "main", "main", -1, null, 0);
@@ -148,6 +150,14 @@ internal static class SyntheticMigrationRehearsal
                         "Rehearsal changed the original fixture.");
             }
 
+            // Only a completely verified clone/backup/rollback produces
+            // the second audit record. Detached checkpoint signing and
+            // comparison happen independently in the test harness.
+            var auditHead = auditTrail.Append("synthetic-rollback-verified");
+            if (auditHead.Entries != 2)
+                throw new InvalidOperationException(
+                    "Synthetic recovery audit did not have two expected events.");
+
             return new MigrationRehearsalReceipt(
                 Format: "attendance-synthetic-migration-rehearsal-v1",
                 OriginalSchema: oldVersion,
@@ -162,6 +172,7 @@ internal static class SyntheticMigrationRehearsal
                 SyntheticDualReviewVerified: true,
                 DurableReviewLedgerUsed: true,
                 OfflineRootTrustVerified: true,
+                AuditTrailRecorded: true,
                 RealDataUsed: false,
                 ProductionMigrationAuthorized: false,
                 Decision: "NO-GO");
@@ -247,5 +258,5 @@ internal sealed record MigrationRehearsalReceipt(
     bool CloneOnly, bool OriginalUnchanged, bool PreMigrationBackupVerified,
     bool RollbackToOriginalSchemaVerified, bool SyntheticDualReviewVerified,
     bool DurableReviewLedgerUsed, bool OfflineRootTrustVerified,
-    bool RealDataUsed,
+    bool AuditTrailRecorded, bool RealDataUsed,
     bool ProductionMigrationAuthorized, string Decision);

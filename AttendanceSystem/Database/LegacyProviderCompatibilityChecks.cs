@@ -51,6 +51,7 @@ internal static class LegacyProviderCompatibilityChecks
         var entries = root.GetProperty("files").EnumerateArray().ToArray();
         Check(entries.Length == 2, "expected exactly two separate old-schema fixtures");
         var receipts = new List<MigrationRehearsalReceipt>();
+        var checkpoints = new List<SyntheticSignedAuditCheckpoint>();
         foreach (var entry in entries)
         {
             var name = entry.GetProperty("file").GetString();
@@ -78,13 +79,15 @@ internal static class LegacyProviderCompatibilityChecks
                 testReviewers.NewRequest(sha, schema, DateTimeOffset.UtcNow));
             var oneTimeRehearsalLedger =
                 new SyntheticDurableReviewNonceLedger(path);
+            var audit = new SyntheticMigrationAuditChain(path);
 
             var rejectedReceipt = false;
             try
             {
                 SyntheticMigrationRehearsal.Run(
                     path, new string('0', 64), review,
-                    rootPolicy, rootPin, epochLedger, oneTimeRehearsalLedger);
+                    rootPolicy, rootPin, epochLedger, oneTimeRehearsalLedger,
+                    audit);
             }
             catch (InvalidOperationException) { rejectedReceipt = true; }
             Check(rejectedReceipt, "wrong fixture digest rejects before any clone");
@@ -93,8 +96,18 @@ internal static class LegacyProviderCompatibilityChecks
 
             var recovery = SyntheticMigrationRehearsal.Run(
                 path, sha, review, rootPolicy, rootPin, epochLedger,
-                oneTimeRehearsalLedger);
+                oneTimeRehearsalLedger, audit);
             receipts.Add(recovery);
+
+            // Detached checkpoint is signed by a third disposable test key,
+            // independent of the synthetic reviewer and policy-root keys.
+            using (var checkpointSigner = new SyntheticAuditCheckpointTestSigner())
+            {
+                var signedHead = checkpointSigner.Sign(schema, audit.ReadHead());
+                SyntheticAuditCheckpointSmokeChecks.Run(
+                    path, audit, signedHead, checkpointSigner.PinnedTestPublicKey);
+                checkpoints.Add(signedHead);
+            }
 
             var replayDenied = false;
             try
@@ -102,7 +115,7 @@ internal static class LegacyProviderCompatibilityChecks
                 SyntheticMigrationRehearsal.Run(
                     path, sha, review, rootPolicy, rootPin,
                     new SyntheticTrustEpochLedger(path),
-                    new SyntheticDurableReviewNonceLedger(path));
+                    new SyntheticDurableReviewNonceLedger(path), audit);
             }
             catch (InvalidOperationException) { replayDenied = true; }
             Check(replayDenied,
@@ -120,6 +133,7 @@ internal static class LegacyProviderCompatibilityChecks
                   recovery.SyntheticDualReviewVerified &&
                   recovery.DurableReviewLedgerUsed &&
                   recovery.OfflineRootTrustVerified &&
+                  recovery.AuditTrailRecorded &&
                   !recovery.RealDataUsed &&
                   !recovery.ProductionMigrationAuthorized &&
                   recovery.Decision == "NO-GO",
@@ -236,8 +250,14 @@ internal static class LegacyProviderCompatibilityChecks
             Environment.GetEnvironmentVariable("ATTENDANCE_MIGRATION_EVIDENCE_DIR");
         if (!string.IsNullOrWhiteSpace(evidenceDirectory))
         {
+            // The pre-existing recovery writer intentionally demands an empty
+            // evidence directory, so the detached signed audit snapshots are
+            // emitted ONLY AFTER the numeric/unsigned NO-GO report.
             SyntheticMigrationEvidence.Write(receipts, evidenceDirectory);
+            SyntheticAuditCheckpointEvidence.Write(
+                evidenceDirectory, checkpoints);
             Console.WriteLine("SYNTHETIC_RESTORE_EVIDENCE=NO-GO");
+            Console.WriteLine("SYNTHETIC_DETACHED_AUDIT=PASS");
         }
 
         Console.WriteLine("SQLite v1.x -> v2 provider compatibility PASS: 2 real v1.x-generated " +
