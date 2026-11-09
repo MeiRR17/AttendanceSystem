@@ -14,11 +14,12 @@ The vendor's 2.0.1 migration notes describe replacement of the previous \`SQLite
 
 ## Actual source changes
 
-- Pin the single direct ADO.NET package \`System.Data.SQLite\` to \`2.0.4\`, replacing \`System.Data.SQLite.Core 1.0.119\`. No schema, roster, notification, API or hardware semantics are intentionally changed.
+- Pin the ADO.NET managed package \`System.Data.SQLite\` to \`2.0.4\`, replacing \`System.Data.SQLite.Core 1.0.119\`. Add the required native `SourceGear.sqlite3 3.53.4` P/Invoke runtime for `e_sqlite3`; no schema, roster, notification, API or hardware semantics are intentionally changed.
 - Continue strict NuGet security auditing with all direct/transitive references and fail-closed minimum **moderate** advisory policy. \`NU1900, NU1902, NU1903, NU1904, NU1905\` remain build/restore errors.
 - Update the post-restore \`project.assets.json\` allow/deny script to require exactly one \`System.Data.SQLite/2.0.4\`, and prohibit the old \`System.Data.SQLite.Core\`, EF6, \`EntityFramework\`, vulnerable \`System.Data.SqlClient\`/\`System.Drawing.Common\`, and unused Twilio.
 - Keep clean Windows .NET 10 Restore, Release Build and all existing offline synthetic test suites as required acceptance gates. Especially important: SQLite v4 schema migration, idempotent events/replays, unique constraints, FK enforcement, transactions, WAL-safe backup/restore, AES-GCM restoration, lock contention, rules, outbox, authenticated API and safe startup.
-- The exact pinned package, source commit and resolved NuGet dependency inventory are recorded in the short-lived unsigned Actions artifacts. Neither constitutes a signed complete software bill of materials nor independent supply-chain verification.
+- Initial CI #42634548039 restored and built successfully, but SQLite tests failed with `DllNotFoundException` because 2.x requires a separate `e_sqlite3` native library. The maintainer recommends SourceGear.sqlite3. This change adds and pins it; follow-up CI must verify runtime before claims of compatibility.
+- The exact pinned packages, source commit and resolved NuGet dependency inventory are recorded in the short-lived unsigned Actions artifacts. Neither constitutes a signed complete software bill of materials nor independent supply-chain verification.
 
 ## Migration / rollback policy
 
@@ -38,3 +39,7 @@ CI run on this **exact commit** must show:
 5. No real device connection, real WhatsApp sending, private student data or automatic production Release/tag is introduced.
 
 **Production decision: NO-GO** regardless of synthetic results.
+
+## Native dependency source
+
+System.Data.SQLite 2.x requires a separate `e_sqlite3` library. The upstream maintainer recommends SourceGear.sqlite3 native package builds. SourceGear.sqlite3 3.53.4 is pinned rather than loading arbitrary DLLs from host PATH. This branch does not redistribute native vendor scanner SDK binaries or claim Realand compatibility. References: https://system.data.sqlite.org/home/info/3da85aab5b67862260f7d1f1eb5e033bc7e73ab8 and https://www.nuget.org/packages/SourceGear.sqlite3/3.53.4.

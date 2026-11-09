@@ -22,6 +22,8 @@
     <!-- v2 provider is now shipped as System.Data.SQLite directly, without EF6.
          Major native P/Invoke change: all DB/backup tests are mandatory. -->
     <PackageReference Include="System.Data.SQLite" Version="2.0.4" />
+    <!-- Provider 2.x requires separate native e_sqlite3 P/Invoke runtime assets. -->
+    <PackageReference Include="SourceGear.sqlite3" Version="3.53.4" />
     <!-- Twilio SDK intentionally omitted. v0.6.0 transports only synthetic dry-runs. -->
     <PackageReference Include="Zmanim" Version="1.5.0" />
   </ItemGroup>

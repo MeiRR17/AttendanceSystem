@@ -62,6 +62,12 @@ $provider = @($packages | Where-Object {
 if ($provider.Count -ne 1) {
   throw 'Expected System.Data.SQLite 2.0.4 did not resolve exactly once.'
 }
+$native = @($packages | Where-Object {
+  $_.id -eq 'SourceGear.sqlite3' -and $_.resolvedVersion -eq '3.53.4'
+})
+if ($native.Count -ne 1) {
+  throw 'Required e_sqlite3 native package SourceGear.sqlite3 3.53.4 missing.'
+}
 
 # Store resolved dependency inventory for inspection. This is not a complete
 # SBOM, vulnerability feed export, binary signature or license clearance.
@@ -93,3 +99,4 @@ Write-Output 'NUGET_GRAPH_AUDIT=PASS'
 Write-Output "TOTAL_NODES=$($packages.Count)"
 Write-Output 'LEGACY_EF6_SQLCLIENT_DRAWING_TWILIO=ABSENT'
 Write-Output 'SQLITE_PROVIDER=System.Data.SQLite/2.0.4'
+Write-Output 'SQLITE_NATIVE=SourceGear.sqlite3/3.53.4'
