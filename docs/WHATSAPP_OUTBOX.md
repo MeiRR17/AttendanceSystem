@@ -7,7 +7,7 @@ Schema version 3 adds additive, transactional SQLite tables:
 
 - NotificationConsents: pseudonymous RecipientKey and Purpose, IsGranted flag, opaque external EvidenceRef and consent change timestamp. Grant and opt-out are explicit and audited.
 - NotificationTemplates: TemplateKey, Purpose, opaque ApprovalEvidenceRef and enabled switch. These are internal approval references, not proof of Meta/WhatsApp/Twilio template approval.
-- NotificationOutbox: EventID, RecipientKey, Purpose, TemplateKey, RuleVersion, state/attempt count/next attempt and result metadata. Unique (EventID, RecipientKey, Purpose, TemplateKey, RuleVersion) blocks duplicate logical requests.
+- NotificationOutbox: EventID, RecipientKey, Purpose, TemplateKey, RuleVersion, state/attempt count/next attempt and result metadata. Unique (EventID, RecipientKey, Purpose) blocks duplicate logical requests even if template or rules version changes.
 - NotificationAttempts: append-only metadata-only attempt ledger. No real message bodies, student names, phone numbers or Twilio secrets are stored.
 
 The migration preserves old Students, Attendance and Holidays; existing databases still require an explicit authorized, backed-up migration. No production database is automatically upgraded by starting the app.
@@ -38,7 +38,7 @@ Run on Windows/.NET 10:
     dotnet build AttendanceSystem.sln -c Release --no-restore
     dotnet run --project AttendanceSystem/AttendanceSystem.csproj -c Release --no-build -- --self-test-outbox
 
-Tests create only disposable synthetic SQLite databases. They cover unauthorized enqueue (no consent/template), grant, duplicate enqueue, one-recipient 24-hour cap, Simulated terminal state, 3-attempt exponential backoff and dead-letter, consent opt-out, disabled template, revoked Late decision, held ambiguous result (no retry), metadata audit and attendance-event preservation. No outgoing HTTP, WhatsApp, Twilio API, real user phone or real student identity is involved.
+Tests create only disposable synthetic SQLite databases. They also assert that the retired direct-send API fails closed. They cover unauthorized enqueue (no consent/template), grant, duplicate enqueue, one-recipient 24-hour cap, Simulated terminal state, 3-attempt exponential backoff and dead-letter, consent opt-out, disabled template, revoked Late decision, held ambiguous result (no retry), metadata audit and attendance-event preservation. No outgoing HTTP, WhatsApp, Twilio API, real user phone or real student identity is involved.
 
 ## Production blockers
 - Verified consent legal basis/identity and RBAC on grants/revocations; guardian authorization as applicable.

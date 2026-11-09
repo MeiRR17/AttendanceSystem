@@ -44,6 +44,18 @@ public static class NotificationOutboxSmokeChecks
             }
 
             var outbox = new NotificationOutboxService(path);
+            try
+            {
+#pragma warning disable CS0618
+                new AttendanceSystem.Services.NotificationService().SendLateNotification(
+                    "synthetic", "synthetic-id", "+10000000000", DateTime.UtcNow);
+#pragma warning restore CS0618
+                throw new InvalidOperationException("Unsafe direct Twilio path was not disabled.");
+            }
+            catch (NotSupportedException)
+            {
+                // Correct: legacy direct sends always fail closed without provider use.
+            }
             Invalid(() => outbox.EnqueueLate(1,"recipient-1","template-1","synthetic-rule-v1",now),
                     "no consent and template");
             outbox.RegisterTemplate("template-1",true,"synthetic-approval-evidence",now);
