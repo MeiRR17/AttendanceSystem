@@ -18,7 +18,27 @@ public static class DatabaseSetup
         InitializeDatabaseAtPath(string.IsNullOrWhiteSpace(path) ? "attendance.db" : path);
     }
 
+    // This obsolete boolean cannot grant authority for a private database.
+    // The public method can create a new DB or validate an existing current
+    // DB, but MUST NOT upgrade an existing schema, regardless of flag value.
     public static void InitializeDatabaseAtPath(string path, bool allowExistingUpgrade = false)
+    {
+        if (allowExistingUpgrade)
+            throw new InvalidOperationException(
+                "Existing database upgrades are unavailable via public API.");
+        InitializeDatabaseCore(path, permitSyntheticExistingUpgrade: false);
+    }
+
+    // Test-only entry point. No production CLI, HTTP route, or public API
+    // exposes this path. A dedicated synthetic-only scope is checked first.
+    internal static void InitializeSyntheticFixtureAtPath(string path)
+    {
+        SyntheticMigrationScope.Demand(path);
+        InitializeDatabaseCore(path, permitSyntheticExistingUpgrade: true);
+    }
+
+    private static void InitializeDatabaseCore(
+        string path, bool permitSyntheticExistingUpgrade)
     {
         if (string.IsNullOrWhiteSpace(path))
             throw new ArgumentException("Database path is required.", nameof(path));
@@ -40,7 +60,7 @@ public static class DatabaseSetup
             return;
         }
 
-        if (existed && !allowExistingUpgrade)
+        if (existed && !permitSyntheticExistingUpgrade)
             throw new InvalidOperationException(
                 "Existing database migration requires a verified backup and explicit approval. " +
                 "Use an authorized upgrade process; never migrate a real student database in CI.");

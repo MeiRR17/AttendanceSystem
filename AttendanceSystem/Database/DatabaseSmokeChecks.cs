@@ -63,7 +63,45 @@ public static class DatabaseSmokeChecks
             ExpectInvalidOperation(
                 () => DatabaseSetup.InitializeDatabaseAtPath(legacy),
                 "legacy upgrade requires explicit opt-in");
-            DatabaseSetup.InitializeDatabaseAtPath(legacy, allowExistingUpgrade: true);
+            // The old public bool cannot authorize an existing DB upgrade.
+            ExpectInvalidOperation(
+                () => DatabaseSetup.InitializeDatabaseAtPath(legacy, allowExistingUpgrade: true),
+                "public true flag cannot bypass migration gate");
+            Check(Directory.GetFiles(root, "legacy.db.pre-migration-*.bak").Length == 0,
+                  "public guard prevented plaintext backup");
+
+            var oldFlag = Environment.GetEnvironmentVariable("ATTENDANCE_SYNTHETIC_FIXTURES");
+            try
+            {
+                Environment.SetEnvironmentVariable("ATTENDANCE_SYNTHETIC_FIXTURES", null);
+                ExpectInvalidOperation(
+                    () => DatabaseSetup.InitializeSyntheticFixtureAtPath(legacy),
+                    "missing synthetic opt-in denied");
+
+                Environment.SetEnvironmentVariable("ATTENDANCE_SYNTHETIC_FIXTURES", "true");
+                // A TEMP directory alone does not qualify: the fixture must be
+                // an immediate whitelisted child and links are disallowed.
+                var nested = Path.Combine(root, "unapproved");
+                Directory.CreateDirectory(nested);
+                var nestedDb = Path.Combine(nested, "nested.db");
+                using (var source = DatabaseSetup.Open(legacy))
+                using (var dest = DatabaseSetup.Open(nestedDb, failIfMissing: false))
+                    source.BackupDatabase(dest, "main", "main", -1, null, 0);
+                ExpectInvalidOperation(
+                    () => DatabaseSetup.InitializeSyntheticFixtureAtPath(nestedDb),
+                    "nested fixture directory rejected");
+                Check(Directory.GetFiles(nested, "*.pre-migration-*.bak").Length == 0,
+                      "invalid fixture produced no plaintext backup");
+                using (var db = DatabaseSetup.Open(nestedDb))
+                    Check(DatabaseSetup.ReadVersion(db) == 0,
+                          "nested source remains unmodified");
+
+                DatabaseSetup.InitializeSyntheticFixtureAtPath(legacy);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("ATTENDANCE_SYNTHETIC_FIXTURES", oldFlag);
+            }
             using (var db = DatabaseSetup.Open(legacy))
             {
                 Check(DatabaseSetup.ReadVersion(db) == DatabaseSetup.CurrentSchemaVersion, "legacy migrated schema");
@@ -75,7 +113,8 @@ public static class DatabaseSmokeChecks
             Check(Directory.GetFiles(root, "legacy.db.pre-migration-*.bak").Length == 1,
                   "verified SQLite backup produced");
 
-            Console.WriteLine("SQLite schema and idempotent event smoke checks passed (10 assertions).");
+            Console.WriteLine("SQLite event and idempotency checks passed; public upgrade bypass, " +
+                              "missing flag, unapproved TEMP path and scoped synthetic upgrade denied/allowed correctly.");
         }
         finally
         {
