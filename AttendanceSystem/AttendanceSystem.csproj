@@ -7,7 +7,7 @@
     <LangVersion>latest</LangVersion>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <!-- Fail closed on moderate/serious transitive NuGet advisories and audit outages.
-         Do NOT suppress advisories for production. Legacy provider v2 migration is separate. -->
+         Do NOT suppress advisories for production. Fail closed on known security advisories. -->
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
     <NuGetAuditLevel>moderate</NuGetAuditLevel>
@@ -19,8 +19,9 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NodaTime" Version="3.2.0" />
-    <!-- ADO.NET provider only: the meta-package adds unused EF6 + transitive vulnerabilities. -->
-    <PackageReference Include="System.Data.SQLite.Core" Version="1.0.119" />
+    <!-- v2 provider is now shipped as System.Data.SQLite directly, without EF6.
+         Major native P/Invoke change: all DB/backup tests are mandatory. -->
+    <PackageReference Include="System.Data.SQLite" Version="2.0.4" />
     <!-- Twilio SDK intentionally omitted. v0.6.0 transports only synthetic dry-runs. -->
     <PackageReference Include="Zmanim" Version="1.5.0" />
   </ItemGroup>

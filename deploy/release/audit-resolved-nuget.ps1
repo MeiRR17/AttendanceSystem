@@ -41,7 +41,7 @@ if ($packages.Count -lt 6) {
 }
 
 $disallowed = @(
-  'System.Data.SQLite',
+  'System.Data.SQLite.Core',
   'System.Data.SQLite.EF6',
   'EntityFramework',
   'System.Data.SqlClient',
@@ -54,13 +54,13 @@ if ($foundForbidden.Count -gt 0) {
   throw ('Unsupported/vulnerable dependency family remains: ' + ($foundForbidden -join ', '))
 }
 
-# A provider major-version migration is NOT attempted in this review.
-# Exact version retained to preserve existing SQLite ADO.NET API semantics.
-$core = @($packages | Where-Object {
-  $_.id -eq 'System.Data.SQLite.Core' -and $_.resolvedVersion -eq '1.0.119'
+# v2 is a new package distribution with P/Invoke native interop.
+# The full Windows native+schema/backup regression must also pass.
+$provider = @($packages | Where-Object {
+  $_.id -eq 'System.Data.SQLite' -and $_.resolvedVersion -eq '2.0.4'
 })
-if ($core.Count -ne 1) {
-  throw 'Expected vetted interim System.Data.SQLite.Core 1.0.119 not resolved.'
+if ($provider.Count -ne 1) {
+  throw 'Expected System.Data.SQLite 2.0.4 did not resolve exactly once.'
 }
 
 # Store resolved dependency inventory for inspection. This is not a complete
@@ -82,7 +82,7 @@ $inventory = [ordered]@{
     'NuGetAudit consults its online advisory feed at restore time.',
     'Historical vulnerable packages can still be present in old releases.',
     'Vendor SDK DLLs are NOT audited by NuGet.',
-    'The current SQLite.Core 1.0.119 is an interim pinned provider, not a final v2 migration.',
+    'SQLite provider System.Data.SQLite 2.0.4 changes native P/Invoke distribution; verify Windows runtime and backup smoke.',
     'No transitive license provenance and no production deployment authorization.'
   )
 }
@@ -92,3 +92,4 @@ $inventory | ConvertTo-Json -Depth 8 |
 Write-Output 'NUGET_GRAPH_AUDIT=PASS'
 Write-Output "TOTAL_NODES=$($packages.Count)"
 Write-Output 'LEGACY_EF6_SQLCLIENT_DRAWING_TWILIO=ABSENT'
+Write-Output 'SQLITE_PROVIDER=System.Data.SQLite/2.0.4'

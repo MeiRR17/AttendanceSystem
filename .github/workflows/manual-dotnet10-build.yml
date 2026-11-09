@@ -14,6 +14,7 @@ on:
       - 'codex/v0.9.0-observability-fault-injection-20261109'
       - 'codex/v0.10.0-encrypted-backup-staging-pilot-20261109'
       - 'codex/v1.0.0-rc-evidence-no-go-20261109'
+      - 'codex/v1.0.0-rc1-nuget-supply-chain-20261109'
     paths:
       - 'AttendanceSystem/**'
       - 'AttendanceSystem.sln'

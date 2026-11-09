@@ -45,7 +45,7 @@ Output directory must be new or empty. Never upload the artifact to a public Rel
 | Operational deployment, TLS/monitoring/on-call | Localhost experiments only | BLOCKED P0 |
 | Three accountable owner signatures and approval record | Not provided/verified | BLOCKED P0 |
 | Reproducible signed executable, complete SBOM and v1.0.0 tag | Explicitly not generated until prior gates are met | BLOCKED |
-| Transitive NuGet vulnerability review | Prior Windows CI reported NU1902/NU1903 for System.Data.SqlClient 4.8.1 and NU1904 for System.Drawing.Common 4.7.0. The rc.1 branch proposes direct SQLite.Core in place of the EF6 meta-package, removes dormant Twilio SDK, and adds NuGetAuditLevel=moderate with NU1900/NU1902–NU1905 errors. | Candidate remediation MUST be verified in its own Windows CI; no blanket production clearance, complete SBOM or SDK DLL audit. |
+| Transitive NuGet vulnerability review | Prior Windows CI reported NU1902/NU1903 for System.Data.SqlClient 4.8.1 and NU1904 for System.Drawing.Common 4.7.0. The rc.1 branch proposes direct SQLite.Core in place of the EF6 meta-package, removes dormant Twilio SDK, and adds NuGetAuditLevel=moderate with NU1900/NU1902–NU1905 errors. | rc.1 CI verified old vulnerable EF6 transitive packages removed; rc.2 now upgrades SQLite provider to 2.0.4, requiring independent Windows native interop and restore regression. No blanket production clearance, complete SBOM or SDK DLL audit. |
 
 **Decision: NO-GO.** The engineering code may be reviewed and tested on synthetic fixtures; it must not be connected to students, real recipients or an institutional scanner or promoted to production.
 
